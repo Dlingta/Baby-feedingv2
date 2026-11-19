@@ -1,0 +1,184 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   自定义字体挂载区 (Custom Font Hooks)
+   将字体文件放入 /public/fonts/ 目录后，取消下方对应注释即可生效：
+   ========================================================================== */
+/*
+@font-face {
+  font-family: 'PlanetDisplay';
+  src: url('/fonts/display.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PlanetBody';
+  src: url('/fonts/body.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PlanetMono';
+  src: url('/fonts/mono.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+*/
+
+:root {
+  --font-display: 'PlanetDisplay', 'Ma Shan Zheng', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  --font-body: 'PlanetBody', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-typewriter: 'PlanetMono', 'Courier Prime', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --cosmic-deep: #09132e;
+  --cosmic-mid: #12224d;
+  --parchment: #fbf4e4;
+  --parchment-edge: #efe2c8;
+  --ink-primary: #2d251e;
+  --ink-secondary: #6e6052;
+  --star-gold: #f6c445;
+  --star-glow: rgba(253, 224, 71, 0.48);
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  background-color: #070e23;
+  color: #f8f4e8;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-typewriter {
+  font-family: var(--font-typewriter);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 撕纸边缘手帐纸张效果 (Torn-edge cream paper card) */
+.paper-card {
+  background-color: var(--parchment);
+  color: var(--ink-primary);
+  background-image:
+    radial-gradient(rgba(139, 111, 78, 0.06) 1px, transparent 0),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.45) 0%, rgba(239, 224, 197, 0.35) 100%);
+  background-size: 16px 16px, 100% 100%;
+  box-shadow:
+    0 10px 26px -6px rgba(4, 9, 26, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -2px 6px rgba(182, 152, 110, 0.22);
+  border-radius: 18px 20px 19px 17px / 19px 17px 20px 18px;
+}
+
+.paper-card-soft {
+  background-color: #f9f1df;
+  color: var(--ink-primary);
+  box-shadow:
+    0 6px 18px -4px rgba(4, 9, 26, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  border-radius: 16px 18px 17px 15px;
+}
+
+/* 手绘撕纸边缘卡片 (使用上传素材 diary_paper_clean.png 九宫格拉伸) */
+.diary-paper-card {
+  color: #182848;
+  border-style: solid;
+  border-width: 14px;
+  border-image-source: url('/assets/extracted/diary_paper_clean.png');
+  border-image-slice: 44 fill;
+  border-image-width: 18px;
+  border-image-repeat: stretch;
+  filter: drop-shadow(0 8px 18px rgba(4, 10, 28, 0.48));
+}
+
+/* 贴纸卡片效果 (Sticker card style) */
+.sticker-card {
+  background: linear-gradient(135deg, #fffaf0 0%, #f7ead0 100%);
+  color: var(--ink-primary);
+  border: 2.5px solid #ffffff;
+  box-shadow:
+    0 8px 20px -4px rgba(4, 10, 28, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.16);
+}
+
+/* 宇宙星空微纹理 */
+.cosmic-canvas {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(56, 107, 198, 0.24) 0%, transparent 45%),
+    radial-gradient(circle at 82% 28%, rgba(246, 196, 69, 0.1) 0%, transparent 40%),
+    linear-gradient(180deg, #09132e 0%, #0f1e47 52%, #0a1638 100%);
+}
+
+/* 隐藏滚动条但保留滑动能力 */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* 星星微闪烁与打卡动画 */
+@keyframes starPop {
+  0% {
+    transform: scale(0.5) rotate(-18deg);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.22) rotate(8deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.animate-star-pop {
+  animation: starPop 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 4.2s ease-in-out infinite;
+}
+
+@keyframes radioWave {
+  0%, 100% {
+    transform: scaleY(0.45);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-slow,
+  .animate-star-pop {
+    animation: none !important;
+  }
+}
