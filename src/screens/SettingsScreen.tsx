@@ -1,16 +1,15 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   CheckCircle2,
   Download,
-  Plus,
   Sparkles,
   Trash2,
   Upload,
   UserPlus,
 } from 'lucide-react';
 import { BabyProfile, PlanetAppState } from '../types/planet';
-import { calculatePlanetAge, REFERENCE_TODAY } from '../data/initialData';
+import { calculatePlanetAge, getTodayDateStr } from '../data/initialData';
 
 interface SettingsScreenProps {
   state: PlanetAppState;
@@ -32,7 +31,15 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [feedback, setFeedback] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
-  const agePreview = calculatePlanetAge(birthDate, REFERENCE_TODAY);
+  const todayStr = getTodayDateStr();
+  const agePreview = calculatePlanetAge(birthDate, todayStr);
+  const derivedPlanetTitle = name.trim() ? `${name.trim()}的登陆手帐` : '未知漫游者的登陆手帐';
+
+  useEffect(() => {
+    setName(state.profile.name);
+    setPlanetName(state.profile.planetName);
+    setBirthDate(state.profile.birthDate);
+  }, [state.profile.name, state.profile.planetName, state.profile.birthDate]);
 
   const showToast = (msg: string) => {
     setFeedback(msg);
@@ -41,10 +48,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   const handleSaveBasic = (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedName = name.trim();
+    const nextPlanetName = trimmedName ? `${trimmedName}的登陆手帐` : '未知漫游者的登陆手帐';
+    setPlanetName(nextPlanetName);
     onUpdateProfile({
       ...state.profile,
-      name: name.trim() || '小星尘',
-      planetName: planetName.trim() || '未知漫游者的登陆手帐',
+      name: trimmedName,
+      planetName: nextPlanetName,
       birthDate,
     });
     showToast('星球基本档案已更新并同步');
@@ -83,7 +93,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `planet-memories-${REFERENCE_TODAY}.json`;
+    a.download = `planet-memories-${todayStr}.json`;
     a.click();
     URL.revokeObjectURL(url);
     showToast('宇宙记忆包已打包导出（JSON）');
@@ -167,21 +177,17 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="例如：小星尘"
+              onChange={(e) => {
+                const nextVal = e.target.value;
+                setName(nextVal);
+                setPlanetName(nextVal.trim() ? `${nextVal.trim()}的登陆手帐` : '未知漫游者的登陆手帐');
+              }}
+              placeholder="留空时显示“未知漫游者”"
               className="mt-1 w-full rounded-xl border border-[#dccbb0] bg-white px-3 py-2.5 text-sm font-semibold text-[#2d251e]"
             />
-          </label>
-
-          <label className="block">
-            <span className="text-xs font-semibold text-[#6e6052]">星球手帐名称</span>
-            <input
-              type="text"
-              value={planetName}
-              onChange={(e) => setPlanetName(e.target.value)}
-              placeholder="未知漫游者的登陆手帐"
-              className="mt-1 w-full rounded-xl border border-[#dccbb0] bg-white px-3 py-2.5 text-sm text-[#2d251e]"
-            />
+            <span className="mt-1 block text-[11px] text-[#7c6e5f]">
+              首页标题预览：<strong className="text-[#2d251e]">{derivedPlanetTitle}</strong>
+            </span>
           </label>
 
           <label className="block">
@@ -198,7 +204,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           <div className="rounded-xl bg-[#efe3cb] px-3.5 py-2.5">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#6e6052]">
               <Sparkles className="h-3.5 w-3.5 text-amber-700" />
-              <span>实时年龄计算预览（基准日 {REFERENCE_TODAY.replace(/-/g, '.')}）</span>
+              <span>实时年龄计算预览（今日 {todayStr.replace(/-/g, '.')}）</span>
             </div>
             <div className="mt-1 text-sm font-bold text-[#2d251e] tabular-nums">
               {agePreview ? agePreview.detailLabel : '尚未设定出生日期，首页将展示“等待建立星球连接…”'}

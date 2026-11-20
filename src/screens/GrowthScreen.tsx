@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowLeft, Plus, Ruler, Trash2 } from 'lucide-react';
 import { GrowthRecord, PlanetAppState } from '../types/planet';
-import { REFERENCE_TODAY } from '../data/initialData';
+import { getTodayDateStr } from '../data/initialData';
 import { IconSprout } from '../components/Illustrations';
 
 export type GrowthViewMode = 'chart' | 'form';
@@ -40,7 +40,7 @@ export const GrowthScreen: React.FC<GrowthScreenProps> = ({
   );
 
   // 4.2 新建表单状态
-  const [formDate, setFormDate] = useState(REFERENCE_TODAY);
+  const [formDate, setFormDate] = useState(() => getTodayDateStr());
   const [heightStr, setHeightStr] = useState('56.5');
   const [weightStr, setWeightStr] = useState('5.10');
   const [headStr, setHeadStr] = useState('37.1');

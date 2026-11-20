@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Check, ChevronRight, Settings, ShieldAlert, Sparkles } from 'lucide-react';
 import { ChecklistItem, ModuleTab, PlanetAppState, VaccineDose } from '../types/planet';
-import { calculatePlanetAge, formatTypewriterDate, REFERENCE_TODAY } from '../data/initialData';
+import { calculatePlanetAge, formatTypewriterDate, getTodayDateStr } from '../data/initialData';
 import {
   AssetSlot,
   IconBottle,
@@ -29,13 +29,35 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onQuickOpenVaccine,
 }) => {
   const [recentCheckedId, setRecentCheckedId] = useState<string | null>(null);
+  const [todayDate, setTodayDate] = useState<string>(() => getTodayDateStr());
+
+  useEffect(() => {
+    const syncDate = () => {
+      const current = getTodayDateStr();
+      setTodayDate((prev) => (prev === current ? prev : current));
+    };
+    const timer = window.setInterval(syncDate, 30000);
+    document.addEventListener('visibilitychange', syncDate);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', syncDate);
+    };
+  }, []);
 
   const isInitialized = Boolean(state.profile.birthDate) && !forceEmptyState;
-  const ageInfo = calculatePlanetAge(state.profile.birthDate, REFERENCE_TODAY);
+  const ageInfo = calculatePlanetAge(state.profile.birthDate, todayDate);
+  const babyName = state.profile.name.trim();
+  const titleOwnerLine = babyName ? `${babyName}的` : '未知漫游者的';
+  const titleSizeClass =
+    titleOwnerLine.length <= 6
+      ? 'text-[31px]'
+      : titleOwnerLine.length <= 8
+      ? 'text-[27px]'
+      : 'text-[23px]';
 
   const todayDiariesCount = state.diaries.length;
-  const todayFeedingsCount = state.feedings.filter((f) => f.date === REFERENCE_TODAY).length;
-  const hasTodayGrowth = state.growths.some((g) => g.date === REFERENCE_TODAY);
+  const todayFeedingsCount = state.feedings.filter((f) => f.date === todayDate).length;
+  const hasTodayGrowth = state.growths.some((g) => g.date === todayDate);
   const activatedCount = state.vaccines.filter((v) => v.status === 'activated').length;
   const nextVaccine =
     state.vaccines.find((v) => v.status === 'next') ||
@@ -54,7 +76,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <div className="relative flex min-h-full flex-col justify-between px-5 pb-8 pt-6">
         <div className="flex items-center justify-between">
           <span className="font-typewriter text-sm tracking-wide text-amber-100/80">
-            {formatTypewriterDate(REFERENCE_TODAY)}
+            {formatTypewriterDate(todayDate)}
           </span>
           <span className="text-xs text-indigo-200/70">未绑定档案</span>
         </div>
@@ -179,7 +201,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <div className="absolute left-4 right-4 top-[1.8%] z-40 flex items-center justify-between">
           <div className="pointer-events-none flex items-center gap-1.5">
             <span className="font-typewriter text-[14.5px] font-normal tracking-wider text-white/95 drop-shadow">
-              {formatTypewriterDate(REFERENCE_TODAY)}
+              {formatTypewriterDate(todayDate)}
             </span>
             <span className="text-[11px] text-amber-200/95" aria-hidden="true">✦</span>
           </div>
@@ -280,15 +302,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </AssetSlot>
         </div>
 
-        {/* Layer 6: 手写标题与登陆天数 (精确锁定 top: 15.2%) */}
-        <div className="pointer-events-none absolute left-6 top-[15.2%] z-30 transform -rotate-[3deg] origin-left">
+        {/* Layer 6: 手写标题与登陆天数 (未填写宝宝昵称时显示“未知漫游者的”，填写后显示“{宝宝名字}的”) */}
+        <button
+          type="button"
+          onClick={() => onNavigate('settings')}
+          aria-label="编辑宝宝信息"
+          className="absolute left-6 top-[15.2%] z-30 max-w-[66%] origin-left -rotate-[3deg] transform text-left transition-transform active:scale-[0.98]"
+        >
           <div className="inline-block">
-            <h1 className="font-display text-[31px] leading-[1.12] tracking-wider text-[#fff9ea] drop-shadow-[0_3px_10px_rgba(4,10,28,0.8)]">
-              未知漫游者的
-              <br />
+            <h1
+              className={`font-display ${titleSizeClass} leading-[1.12] tracking-wider text-[#fff9ea] drop-shadow-[0_3px_10px_rgba(4,10,28,0.8)]`}
+            >
+              <span className="block truncate">{titleOwnerLine}</span>
               <span className="inline-flex items-center gap-2">
                 <span>登陆手帐</span>
-                <svg viewBox="0 0 46 28" className="h-6 w-10 inline-block" fill="none" aria-hidden="true">
+                <svg viewBox="0 0 46 28" className="h-6 w-10 inline-block shrink-0" fill="none" aria-hidden="true">
                   <path
                     d="M6 17L9 14M9 17L6 14"
                     stroke="#FDE047"
@@ -316,17 +344,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
 
           <p className="mt-1.5 text-[13.5px] font-medium tracking-wide text-white/95 drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]">
-            登陆地球的第{' '}
-            <span className="font-typewriter text-[19px] font-bold text-[#fde047] tabular-nums">
-              {ageInfo?.days ?? 1}
-            </span>{' '}
-            天 / 第{' '}
-            <span className="font-typewriter text-[19px] font-bold text-[#fde047] tabular-nums">
-              {ageInfo?.weeks ?? 1}
-            </span>{' '}
-            周
+            {ageInfo?.isFuture ? (
+              <>
+                距离登陆地球还有{' '}
+                <span className="font-typewriter text-[19px] font-bold text-[#fde047] tabular-nums">
+                  {ageInfo.daysUntil}
+                </span>{' '}
+                天
+              </>
+            ) : (
+              <>
+                登陆地球的第{' '}
+                <span className="font-typewriter text-[19px] font-bold text-[#fde047] tabular-nums">
+                  {ageInfo?.days ?? 1}
+                </span>{' '}
+                天 / 第{' '}
+                <span className="font-typewriter text-[19px] font-bold text-[#fde047] tabular-nums">
+                  {ageInfo?.weeks ?? 1}
+                </span>{' '}
+                周
+              </>
+            )}
           </p>
-        </div>
+        </button>
 
         {/* Layer 7: 地球观测记录弧线文字 + 弯曲星星箭头 */}
         <div className="pointer-events-none absolute inset-x-4 top-[74.5%] z-30 flex items-center justify-center transform -rotate-[3.5deg]">

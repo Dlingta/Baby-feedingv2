@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Calendar, ChevronRight, Mic, Pencil, Trash2, User, X } from 'lucide-react';
 import { DiaryEntry, DiaryMood, DiaryWeather, PlanetAppState } from '../types/planet';
-import { calculatePlanetAge, REFERENCE_TODAY } from '../data/initialData';
+import { calculatePlanetAge, getTodayDateStr } from '../data/initialData';
 import { AssetSlot, IconStar } from '../components/Illustrations';
 
 export type DiaryViewMode = 'list' | 'detail' | 'empty' | 'form';
@@ -79,7 +79,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // 表单状态 (2.3)
-  const [formDate, setFormDate] = useState(REFERENCE_TODAY);
+  const [formDate, setFormDate] = useState(() => getTodayDateStr());
   const [formMood, setFormMood] = useState<DiaryMood>('glowing');
   const [formWeather, setFormWeather] = useState<DiaryWeather>('sunny');
   const [formRecorder, setFormRecorder] = useState(state.profile.recorders[0] || '妈妈');
@@ -92,7 +92,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
   const openCreateForm = () => {
     setEditingId(null);
     setReturnToDetailAfterForm(false);
-    setFormDate(REFERENCE_TODAY);
+    setFormDate(getTodayDateStr());
     setFormMood('glowing');
     setFormWeather('sunny');
     setFormRecorder(state.profile.recorders[0] || '妈妈');

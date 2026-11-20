@@ -8,9 +8,11 @@ import {
   ModuleTab,
   PlanetAppState,
   ScreenCode,
+  VaccineBrandOrigin,
   VaccineDose,
+  VaccineFundingType,
 } from './types/planet';
-import { INITIAL_APP_STATE } from './data/initialData';
+import { createInitialAppState, getTodayDateStr } from './data/initialData';
 import { BottomNav } from './components/BottomNav';
 import { PrototypeSidebar } from './components/PrototypeSidebar';
 import { HomeScreen } from './screens/HomeScreen';
@@ -24,12 +26,31 @@ const STORAGE_KEY = 'planet_feeding_prototype_state_v1';
 
 export default function App() {
   const [state, setState] = useState<PlanetAppState>(() => {
+    const todayStr = getTodayDateStr();
+    const freshInit = createInitialAppState(todayStr);
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as PlanetAppState;
         if (parsed && parsed.profile && Array.isArray(parsed.vaccines)) {
-          // 若仍保留旧版占位日记示例图，平滑升级为新版手绘日记示例图
+          const isLegacyDate = (dateStr?: string) =>
+            Boolean(dateStr && (dateStr.startsWith('2025-10-') || dateStr.startsWith('2025-11-')));
+
+          // 若仍为旧版未编辑过的默认宝宝档案，清空默认占位名并更新基准生日；若用户已填写则完整保留
+          if (
+            parsed.profile.name === '小星尘' &&
+            parsed.profile.birthDate === '2025-10-08'
+          ) {
+            parsed.profile = {
+              ...parsed.profile,
+              name: '',
+              planetName: '未知漫游者的登陆手帐',
+              birthDate: freshInit.profile.birthDate,
+            };
+          }
+
+          // 若仍保留旧版占位日记示例图或旧基准日期，平滑升级为新版手绘日记与实时日期
           if (Array.isArray(parsed.diaries)) {
             const legacyPaths = new Set([
               '/assets/extracted/orange_cat.png',
@@ -37,23 +58,85 @@ export default function App() {
               '/assets/aistudio/___f4298ab8.png',
             ]);
             parsed.diaries = parsed.diaries.map((d) => {
-              const fresh = INITIAL_APP_STATE.diaries.find((init) => init.id === d.id);
-              if (fresh && d.photos?.[0] && legacyPaths.has(d.photos[0])) {
+              const fresh = freshInit.diaries.find((init) => init.id === d.id);
+              if (!fresh) return d;
+              if (d.photos?.[0] && legacyPaths.has(d.photos[0])) {
                 return fresh;
               }
-              if (fresh && !d.reflection) {
-                return { ...d, reflection: fresh.reflection };
-              }
-              return d;
+              return {
+                ...d,
+                date: isLegacyDate(d.date) ? fresh.date : d.date,
+                reflection: d.reflection || fresh.reflection,
+              };
             });
           }
+
+          // 若本地缓存仍是旧版默认喂养数据（未包含营养品示例），平滑补充最新默认示例
+          if (Array.isArray(parsed.feedings)) {
+            if (
+              parsed.feedings.some((f) => f.id === 'feed-1' && f.time === '06:30') &&
+              !parsed.feedings.some((f) => f.type === 'supplement')
+            ) {
+              const customFeedings = parsed.feedings.filter(
+                (f) => !['feed-1', 'feed-2', 'feed-3', 'feed-4', 'feed-5'].includes(f.id)
+              );
+              parsed.feedings = [
+                ...freshInit.feedings.slice(0, 5),
+                ...customFeedings,
+              ];
+            }
+            parsed.feedings = parsed.feedings.map((f) => {
+              const fresh = freshInit.feedings.find((init) => init.id === f.id);
+              if (fresh && isLegacyDate(f.date)) {
+                return { ...f, date: fresh.date };
+              }
+              return f;
+            });
+          }
+
+          if (Array.isArray(parsed.growths)) {
+            parsed.growths = parsed.growths.map((g) => {
+              const fresh = freshInit.growths.find((init) => init.id === g.id);
+              if (fresh && isLegacyDate(g.date)) {
+                return { ...g, date: fresh.date };
+              }
+              return g;
+            });
+          }
+
+          if (Array.isArray(parsed.illnesses)) {
+            const isLegacySeedIllnesses =
+              parsed.illnesses.length === 2 &&
+              parsed.illnesses.every((i) => !i.careCategory) &&
+              parsed.illnesses.some((i) => i.id === 'ill-1' && i.time === '22:40');
+            if (isLegacySeedIllnesses) {
+              parsed.illnesses = freshInit.illnesses;
+            } else {
+              parsed.illnesses = parsed.illnesses.map((i) => {
+                const fresh = freshInit.illnesses.find((init) => init.id === i.id);
+                if (fresh && isLegacyDate(i.date)) {
+                  return { ...i, date: fresh.date };
+                }
+                return i;
+              });
+            }
+          }
+
+          parsed.vaccines = parsed.vaccines.map((v) => {
+            const fresh = freshInit.vaccines.find((init) => init.id === v.id);
+            if (fresh && isLegacyDate(v.inoculatedDate)) {
+              return { ...v, inoculatedDate: fresh.inoculatedDate };
+            }
+            return v;
+          });
+
           return parsed;
         }
       }
     } catch {
       // ignore storage errors
     }
-    return INITIAL_APP_STATE;
+    return freshInit;
   });
 
   const [activeTab, setActiveTab] = useState<ModuleTab>('home');
@@ -241,11 +324,24 @@ export default function App() {
     }));
   };
 
-  const handleConfirmVaccine = (doseId: string, date: string, note: string) => {
+  const handleConfirmVaccine = (
+    doseId: string,
+    date: string,
+    note: string,
+    brandOrigin?: VaccineBrandOrigin,
+    fundingType?: VaccineFundingType
+  ) => {
     setState((prev) => {
       const updated = prev.vaccines.map((v) =>
         v.id === doseId
-          ? { ...v, status: 'activated' as const, inoculatedDate: date, note }
+          ? {
+              ...v,
+              status: 'activated' as const,
+              inoculatedDate: date,
+              brandOrigin: brandOrigin || v.brandOrigin || '国产',
+              fundingType: fundingType || v.fundingType || '免费',
+              note,
+            }
           : v
       );
       // 自动顺延下一针高亮
@@ -268,6 +364,8 @@ export default function App() {
               ...v,
               status: 'locked' as const,
               inoculatedDate: undefined,
+              brandOrigin: undefined,
+              fundingType: undefined,
               note: undefined,
             }
           : v
@@ -286,6 +384,15 @@ export default function App() {
     setState((prev) => ({
       ...prev,
       illnesses: [record, ...prev.illnesses],
+    }));
+  };
+
+  const handleToggleIllnessHandled = (id: string) => {
+    setState((prev) => ({
+      ...prev,
+      illnesses: prev.illnesses.map((item) =>
+        item.id === id ? { ...item, handled: !item.handled } : item
+      ),
     }));
   };
 
@@ -309,7 +416,7 @@ export default function App() {
 
   const handleResetDemo = () => {
     localStorage.removeItem(STORAGE_KEY);
-    setState(INITIAL_APP_STATE);
+    setState(createInitialAppState(getTodayDateStr()));
     setHomeForceEmpty(false);
     setActiveTab('home');
     setDiaryMode('list');
@@ -387,11 +494,13 @@ export default function App() {
                 state={state}
                 mode={healthMode}
                 activeSheetDoseId={activeSheetDoseId}
+                showSlotTag={showSlotTag}
                 onChangeMode={setHealthMode}
                 onBackHome={() => handleNavigateTab('home')}
                 onConfirmVaccine={handleConfirmVaccine}
                 onResetVaccine={handleResetVaccine}
                 onAddIllness={handleAddIllness}
+                onToggleIllnessHandled={handleToggleIllnessHandled}
                 onDeleteIllness={handleDeleteIllness}
               />
             )}
@@ -409,8 +518,12 @@ export default function App() {
             )}
           </div>
 
-          {/* 底部星尘主导航栏 (在日记详情页与新建/编辑页沉浸隐藏，完整呈现长撕纸手帐) */}
-          {!(activeTab === 'diary' && (diaryMode === 'detail' || diaryMode === 'form')) && (
+          {/* 底部星尘主导航栏 (在日记详情/编辑页、喂养键盘录入页与治愈工坊表单页沉浸隐藏) */}
+          {!(
+            (activeTab === 'diary' && (diaryMode === 'detail' || diaryMode === 'form')) ||
+            (activeTab === 'feeding' && feedingMode === 'form') ||
+            (activeTab === 'health' && (healthMode === 'vaccine_sheet' || healthMode === 'illness_form'))
+          ) && (
             <BottomNav
               activeTab={activeTab}
               onSelectTab={handleNavigateTab}
