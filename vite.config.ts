@@ -29,35 +29,52 @@ function scanFontFiles(dir: string, urlPrefix: string): {url: string; format: st
     }));
 }
 
-function buildCustomFontsCss(fontsRoot: string): string {
-  const rootFiles = scanFontFiles(fontsRoot, '.');
-  const namedBody = rootFiles.filter((f) => /^\.\/body\./i.test(decodeURIComponent(f.url)));
-  const namedDisplay = rootFiles.filter((f) => /^\.\/display\./i.test(decodeURIComponent(f.url)));
-  const namedMono = rootFiles.filter((f) => /^\.\/mono\./i.test(decodeURIComponent(f.url)));
+function collectCustomFonts(fontsRoot: string, basePrefix: string) {
+  const rootFiles = scanFontFiles(fontsRoot, basePrefix);
+  const escapePrefix = basePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const namedBody = rootFiles.filter((f) =>
+    new RegExp(`^${escapePrefix}/body\\.`, 'i').test(decodeURIComponent(f.url)),
+  );
+  const namedDisplay = rootFiles.filter((f) =>
+    new RegExp(`^${escapePrefix}/display\\.`, 'i').test(decodeURIComponent(f.url)),
+  );
+  const namedMono = rootFiles.filter((f) =>
+    new RegExp(`^${escapePrefix}/mono\\.`, 'i').test(decodeURIComponent(f.url)),
+  );
   const fallbackRootBody = rootFiles.filter(
-    (f) => !/^\.\/(display|mono)\./i.test(decodeURIComponent(f.url)),
+    (f) => !new RegExp(`^${escapePrefix}/(display|mono)\\.`, 'i').test(decodeURIComponent(f.url)),
   );
 
-  const bodyFonts = [
-    ...scanFontFiles(path.join(fontsRoot, 'body'), './body'),
-    ...(namedBody.length > 0 ? namedBody : fallbackRootBody),
-  ];
-  const displayFonts = [
-    ...scanFontFiles(path.join(fontsRoot, 'display'), './display'),
-    ...namedDisplay,
-  ];
-  const monoFonts = [
-    ...scanFontFiles(path.join(fontsRoot, 'mono'), './mono'),
-    ...namedMono,
-  ];
+  return {
+    bodyFonts: [
+      ...scanFontFiles(path.join(fontsRoot, 'body'), `${basePrefix}/body`),
+      ...(namedBody.length > 0 ? namedBody : fallbackRootBody),
+    ],
+    displayFonts: [
+      ...scanFontFiles(path.join(fontsRoot, 'display'), `${basePrefix}/display`),
+      ...namedDisplay,
+    ],
+    monoFonts: [
+      ...scanFontFiles(path.join(fontsRoot, 'mono'), `${basePrefix}/mono`),
+      ...namedMono,
+    ],
+  };
+}
+
+function buildCustomFontsCss(fontsRoot: string, basePrefix = '.'): string {
+  const {bodyFonts, displayFonts, monoFonts} = collectCustomFonts(fontsRoot, basePrefix);
 
   const blocks: string[] = ['/* Auto-generated from /public/fonts */'];
   const appendFace = (family: string, files: {url: string; format: string}[]) => {
     if (files.length === 0) return;
     const src = files.map((f) => `url('${f.url}') format('${f.format}')`).join(',\n    ');
-    blocks.push(
-      `@font-face {\n  font-family: '${family}';\n  src:\n    ${src};\n  font-weight: 100 900;\n  font-style: normal;\n  font-display: swap;\n}`,
-    );
+    // Emit explicit weights (400/500/600/700) pointing to the same cached font URL
+    // for 100% Safari / iOS / Android WebView compatibility with static fonts.
+    for (const weight of [400, 500, 600, 700]) {
+      blocks.push(
+        `@font-face {\n  font-family: '${family}';\n  src:\n    ${src};\n  font-weight: ${weight};\n  font-style: normal;\n  font-display: swap;\n}`,
+      );
+    }
   };
 
   appendFace('PlanetBody', bodyFonts);
@@ -72,14 +89,14 @@ export default defineConfig(() => {
     plugins: [
       react(),
       tailwindcss(),
-      // Auto-generates /fonts/custom-fonts.css from any uploaded fonts in /public/fonts.
+      // Auto-generates /fonts/custom-fonts.css and inlines @font-face + preload into index.html on build.
       {
         name: 'auto-custom-fonts',
         configureServer(server) {
           server.middlewares.use((req, res, next) => {
             const reqPath = (req.url || '').split('?')[0];
             if (reqPath.endsWith('/fonts/custom-fonts.css')) {
-              const css = buildCustomFontsCss(path.resolve(__dirname, 'public/fonts'));
+              const css = buildCustomFontsCss(path.resolve(__dirname, 'public/fonts'), '.');
               res.statusCode = 200;
               res.setHeader('Content-Type', 'text/css; charset=utf-8');
               res.setHeader('Cache-Control', 'no-store');
@@ -89,11 +106,50 @@ export default defineConfig(() => {
             next();
           });
         },
+        transformIndexHtml: {
+          order: 'post',
+          handler(_html, ctx) {
+            // In production builds, inline @font-face with document-relative ./fonts/... URLs
+            // and preload the primary body font so GitHub Pages loads it immediately without extra CSS round-trips.
+            if (ctx.server) return [];
+            const fontsRoot = path.resolve(__dirname, 'public/fonts');
+            const css = buildCustomFontsCss(fontsRoot, './fonts');
+            const {bodyFonts} = collectCustomFonts(fontsRoot, './fonts');
+            const tags: {tag: string; attrs?: Record<string, string | boolean>; children?: string; injectTo: 'head'}[] = [];
+            const primaryBody = bodyFonts[0];
+            if (primaryBody) {
+              const mimeMap: Record<string, string> = {
+                woff2: 'font/woff2',
+                woff: 'font/woff',
+                truetype: 'font/ttf',
+                opentype: 'font/otf',
+              };
+              tags.push({
+                tag: 'link',
+                attrs: {
+                  rel: 'preload',
+                  as: 'font',
+                  href: primaryBody.url,
+                  type: mimeMap[primaryBody.format] || 'font/woff2',
+                  crossorigin: 'anonymous',
+                },
+                injectTo: 'head',
+              });
+            }
+            tags.push({
+              tag: 'style',
+              attrs: {id: 'planet-custom-fonts'},
+              children: css,
+              injectTo: 'head',
+            });
+            return tags;
+          },
+        },
         closeBundle(error?: Error): void {
           if (error) return;
           const distFontsDir = path.resolve(__dirname, 'dist/fonts');
           fs.mkdirSync(distFontsDir, {recursive: true});
-          const css = buildCustomFontsCss(path.resolve(__dirname, 'public/fonts'));
+          const css = buildCustomFontsCss(path.resolve(__dirname, 'public/fonts'), '.');
           fs.writeFileSync(path.join(distFontsDir, 'custom-fonts.css'), css, 'utf-8');
         },
       },
