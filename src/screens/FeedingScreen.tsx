@@ -20,7 +20,7 @@ import {
 } from '../components/CosmicModuleHeader';
 
 export type FeedingViewMode = 'timeline' | 'empty' | 'form';
-type RangeOption = 7 | 30 | 90;
+type RangeOption = 'day' | 7 | 30 | 90;
 type FormTabKey = 'source' | 'energy' | 'dew';
 
 interface FeedingScreenProps {
@@ -71,7 +71,8 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
 }) => {
   const todayStr = getTodayDateStr();
   const [selectedDate, setSelectedDate] = useState(() => getTodayDateStr());
-  const [rangeDays, setRangeDays] = useState<RangeOption>(7);
+  const [rangeDays, setRangeDays] = useState<RangeOption>('day');
+  const [selectedDayFeedId, setSelectedDayFeedId] = useState<string | null>(null);
   const [showDateBar, setShowDateBar] = useState(false);
   const [showAllRecords, setShowAllRecords] = useState(false);
   const [showFormHelp, setShowFormHelp] = useState(false);
@@ -96,9 +97,35 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
 
   const isEmptyView = mode === 'empty';
 
-  // 构建 7天 / 30天 / 90天 双 Y 轴趋势点（固定 7 个均衡节点，便于移动端阅读）
+  // 当天每顿奶量记录（按时间从早到晚排序，用于「当天」每顿奶量对比折线图）
+  const dayMilkFeeds = useMemo(() => {
+    if (isEmptyView) return [];
+    return state.feedings
+      .filter(
+        (f) => f.date === selectedDate && typeof f.amountMl === 'number' && f.amountMl > 0
+      )
+      .sort((a, b) => a.time.localeCompare(b.time))
+      .map((f, idx) => ({
+        ...f,
+        feedIndex: idx + 1,
+        amountMl: f.amountMl as number,
+      }));
+  }, [state.feedings, selectedDate, isEmptyView]);
+
+  const dayTotalMilkMl = useMemo(
+    () => dayMilkFeeds.reduce((sum, item) => sum + item.amountMl, 0),
+    [dayMilkFeeds]
+  );
+
+  const dayAvgMilkMl = useMemo(
+    () => (dayMilkFeeds.length > 0 ? Math.round(dayTotalMilkMl / dayMilkFeeds.length) : 0),
+    [dayMilkFeeds.length, dayTotalMilkMl]
+  );
+
+  // 构建 7天 / 30天 / 90天 总奶量与总顿数对比趋势点（固定 7 个均衡节点，便于移动端阅读）
   const chartSeries = useMemo(() => {
-    const step = rangeDays === 7 ? 1 : rangeDays === 30 ? 5 : 15;
+    const numericRange = rangeDays === 'day' ? 7 : rangeDays;
+    const step = numericRange === 7 ? 1 : numericRange === 30 ? 5 : 15;
     const points: { date: string; short: string; totalMl: number; count: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const endDate = shiftDate(selectedDate, -i * step);
@@ -107,15 +134,14 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
         ? []
         : state.feedings.filter((f) => f.date >= startDate && f.date <= endDate);
 
-      const rawMl = matching.reduce((sum, r) => sum + (r.amountMl || 0), 0);
-      const avgMl = step === 1 ? rawMl : Math.round(rawMl / step);
-      const avgCount = step === 1 ? matching.length : Number((matching.length / step).toFixed(1));
+      const totalMl = matching.reduce((sum, r) => sum + (r.amountMl || 0), 0);
+      const totalCount = matching.length;
 
       points.push({
         date: endDate,
         short: endDate.slice(5).replace('-', '/'),
-        totalMl: avgMl,
-        count: avgCount,
+        totalMl,
+        count: totalCount,
       });
     }
     return points;
@@ -217,19 +243,46 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
     onChangeMode('timeline');
   };
 
-  // 双 Y 轴折线图坐标计算
-  const maxMlRaw = Math.max(180, ...chartSeries.map((d) => d.totalMl));
-  const maxMl = Math.ceil(maxMlRaw / 60) * 60;
-  const maxCount = Math.max(4, Math.ceil(Math.max(...chartSeries.map((d) => d.count), 4)));
-
+  // 折线图画布尺寸
   const svgW = 328;
-  const svgH = 148;
-  const padL = 32;
-  const padR = 24;
-  const padT = 16;
+  const svgH = 152;
+  const padL = 34;
+  const padR = 26;
+  const padT = 20;
   const padB = 26;
   const plotW = svgW - padL - padR;
   const plotH = svgH - padT - padB;
+
+  // 1) 当天每顿奶量对比折线图坐标
+  const maxDayMlRaw = Math.max(150, ...dayMilkFeeds.map((d) => d.amountMl));
+  const maxDayMl = Math.ceil(maxDayMlRaw / 30) * 30;
+  const dayPlotPadX = dayMilkFeeds.length <= 2 ? 42 : 16;
+  const dayUsableW = Math.max(20, plotW - dayPlotPadX * 2);
+
+  const dayFeedPoints = dayMilkFeeds.map((item, idx) => {
+    const x =
+      dayMilkFeeds.length === 1
+        ? padL + plotW / 2
+        : padL + dayPlotPadX + (idx / (dayMilkFeeds.length - 1)) * dayUsableW;
+    const y = padT + plotH - (item.amountMl / maxDayMl) * plotH;
+    return { x, y, ...item };
+  });
+
+  const dayFeedPath = buildSmoothPath(dayFeedPoints);
+  const dayAreaPath =
+    dayFeedPoints.length >= 2
+      ? `${dayFeedPath} L ${dayFeedPoints[dayFeedPoints.length - 1].x.toFixed(1)} ${(padT + plotH).toFixed(1)} L ${dayFeedPoints[0].x.toFixed(1)} ${(padT + plotH).toFixed(1)} Z`
+      : '';
+  const dayAvgY = padT + plotH - (dayAvgMilkMl / maxDayMl) * plotH;
+  const activeDayFeed =
+    dayFeedPoints.find((p) => p.id === selectedDayFeedId) ||
+    dayFeedPoints[dayFeedPoints.length - 1] ||
+    null;
+
+  // 2) 7天 / 30天 / 90天 总奶量与总顿数双 Y 轴折线图坐标
+  const maxMlRaw = Math.max(180, ...chartSeries.map((d) => d.totalMl));
+  const maxMl = Math.ceil(maxMlRaw / 60) * 60;
+  const maxCount = Math.max(3, Math.ceil(Math.max(...chartSeries.map((d) => d.count), 3) / 3) * 3);
 
   const mlPoints = chartSeries.map((d, idx) => {
     const x = padL + (idx / Math.max(1, chartSeries.length - 1)) * plotW;
@@ -306,24 +359,32 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
     return `母乳 ${sideLabel} ${item.durationMin ?? 15}分`;
   };
 
+  const rangeOptions: { key: RangeOption; label: string }[] = [
+    { key: 'day', label: '当天' },
+    { key: 7, label: '7天' },
+    { key: 30, label: '30天' },
+    { key: 90, label: '90天' },
+  ];
+
   const renderRangePills = () => (
-    <div className="mx-auto mt-1 flex w-[236px] items-center rounded-full border border-white/12 bg-[#162754]/75 p-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] backdrop-blur-md">
-      {([7, 30, 90] as RangeOption[]).map((r, idx) => {
-        const active = rangeDays === r;
+    <div className="mx-auto mt-1 flex w-full max-w-[296px] items-center rounded-full border border-white/12 bg-[#162754]/75 p-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] backdrop-blur-md">
+      {rangeOptions.map((opt, idx) => {
+        const active = rangeDays === opt.key;
+        const nextOpt = rangeOptions[idx + 1];
         return (
-          <React.Fragment key={r}>
+          <React.Fragment key={String(opt.key)}>
             <button
               type="button"
-              onClick={() => setRangeDays(r)}
+              onClick={() => setRangeDays(opt.key)}
               className={`relative flex-1 rounded-full py-1.5 transition-all ${
                 active
                   ? 'bg-gradient-to-b from-[#fde074] to-[#f2b932] typo-tab-active text-[#182848] shadow-[0_2px_12px_rgba(249,207,76,0.55)]'
                   : 'typo-tab text-indigo-100/85 hover:text-white'
               }`}
             >
-              {r}天
+              {opt.label}
             </button>
-            {idx < 2 && !active && rangeDays !== ([7, 30, 90][idx + 1] as RangeOption) && (
+            {nextOpt && !active && rangeDays !== nextOpt.key && (
               <span className="h-3.5 w-[1px] bg-white/15" aria-hidden="true" />
             )}
           </React.Fragment>
@@ -331,6 +392,9 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
       })}
     </div>
   );
+
+  const showFullEmptyState =
+    isEmptyView || (rangeDays === 'day' && !showAllRecords && dayFeedings.length === 0);
 
   return (
     <div className="relative flex min-h-full w-full min-w-0 max-w-full flex-col overflow-x-clip">
@@ -799,7 +863,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
       {/* =================================================================
           3.2 喂养·空状态 (1:1 还原设计图第二屏)
          ================================================================= */}
-      {mode !== 'form' && (isEmptyView || (!showAllRecords && dayFeedings.length === 0)) && (
+      {mode !== 'form' && showFullEmptyState && (
         <div
           style={{ minHeight: 'calc(var(--app-viewport-h) - 68px - var(--safe-top))' }}
           className="relative z-10 flex flex-1 flex-col justify-between px-4 pb-3 pt-1"
@@ -810,14 +874,23 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
             {/* 空状态折线图玻璃卡片 */}
             <div className="relative mt-4 rounded-[22px] border border-white/12 bg-[#122452]/62 px-4 pb-6 pt-3.5 shadow-[0_12px_28px_rgba(3,9,28,0.46)] backdrop-blur-md">
               <div className="flex items-center gap-4 text-[12px] font-medium text-indigo-100/90">
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#5cbcff] shadow-[0_0_6px_#5cbcff]" />
-                  奶量 (ml)
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#f8cb46] shadow-[0_0_6px_#f8cb46]" />
-                  顿数 (次)
-                </span>
+                {rangeDays === 'day' ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#5cbcff] shadow-[0_0_6px_#5cbcff]" />
+                    每顿奶量 (ml)
+                  </span>
+                ) : (
+                  <>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-full bg-[#5cbcff] shadow-[0_0_6px_#5cbcff]" />
+                      总奶量 (ml)
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-full bg-[#f8cb46] shadow-[0_0_6px_#f8cb46]" />
+                      总顿数 (次)
+                    </span>
+                  </>
+                )}
               </div>
 
               <div className="mt-5 flex flex-col items-center text-center">
@@ -867,9 +940,9 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
       )}
 
       {/* =================================================================
-          3.1 喂养·数据与时间线 (1:1 还原设计图第一屏)
+          3.1 喂养·数据与时间线（默认优先展示「当天」每顿奶量对比，可切换 7/30/90 天总奶量与总顿数对比）
          ================================================================= */}
-      {mode === 'timeline' && !isEmptyView && (showAllRecords || dayFeedings.length > 0) && (
+      {mode === 'timeline' && !showFullEmptyState && (
         <div
           style={{ minHeight: 'calc(var(--app-viewport-h) - 68px - var(--safe-top))' }}
           className="relative z-10 flex flex-1 flex-col justify-between px-4 pt-1"
@@ -877,7 +950,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
           <div className="space-y-4">
             {renderRangePills()}
 
-            {/* 深蓝磨砂双 Y 轴折线图卡片 */}
+            {/* 深蓝磨砂折线图卡片 */}
             <div className="relative rounded-[22px] border border-white/12 bg-[#122452]/65 px-3.5 pb-2.5 pt-3 shadow-[0_12px_28px_rgba(3,9,28,0.46)] backdrop-blur-md">
               {/* 右上角点缀发光大星星 */}
               <img
@@ -887,131 +960,311 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                 className="pointer-events-none absolute -right-1.5 -top-3.5 h-9 w-9 object-contain drop-shadow-[0_0_10px_rgba(253,224,71,0.9)]"
               />
 
-              {/* 图例 */}
-              <div className="mb-1 flex items-center justify-between pr-6 text-[11.5px] font-medium text-indigo-100/90">
-                <div className="flex items-center gap-3.5">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#5cbcff] shadow-[0_0_6px_#5cbcff]" />
-                    奶量 (ml)
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#f8cb46] shadow-[0_0_6px_#f8cb46]" />
-                    顿数 (次)
-                  </span>
-                </div>
-                <span className="font-typewriter text-[11px] text-amber-200/85 tabular-nums">
-                  {selectedDate.slice(5).replace('-', '/')}
-                </span>
-              </div>
+              {rangeDays === 'day' ? (
+                <>
+                  {/* 当天模式图例：每顿奶量对比 + 当日汇总 */}
+                  <div className="mb-1 flex items-center justify-between gap-2 pr-6 text-[11.5px] font-medium text-indigo-100/90">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span className="inline-flex shrink-0 items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#5cbcff] shadow-[0_0_6px_#5cbcff]" />
+                        每顿奶量 (ml)
+                      </span>
+                      {dayMilkFeeds.length > 0 && (
+                        <span className="truncate font-typewriter text-[11px] text-amber-200/90 tabular-nums">
+                          共{dayMilkFeeds.length}顿 · {dayTotalMilkMl}ml
+                        </span>
+                      )}
+                    </div>
+                    <span className="shrink-0 font-typewriter text-[11px] text-amber-200/85 tabular-nums">
+                      {selectedDate.slice(5).replace('-', '/')}
+                    </span>
+                  </div>
 
-              {/* 双 Y 轴平滑曲线 SVG */}
-              <svg
-                viewBox={`0 0 ${svgW} ${svgH}`}
-                className="h-[144px] w-full select-none"
-                role="img"
-                aria-label="奶量与顿数双Y轴折线图"
-              >
-                {/* 横向柔和网格线 + 左右双刻度 */}
-                {[0, 1 / 3, 2 / 3, 1].map((ratio, idx) => {
-                  const y = padT + plotH * (1 - ratio);
-                  const mlTick = Math.round(maxMl * ratio);
-                  const cntTick = Math.round(1 + (maxCount - 1) * ratio);
-                  return (
-                    <g key={idx}>
-                      <line
-                        x1={padL}
-                        y1={y}
-                        x2={svgW - padR}
-                        y2={y}
-                        stroke="rgba(255,255,255,0.14)"
-                        strokeWidth="0.8"
-                      />
-                      <text
-                        x={padL - 6}
-                        y={y + 3.5}
-                        textAnchor="end"
-                        fontSize="10"
-                        fill="rgba(235,242,255,0.85)"
+                  {dayFeedPoints.length === 0 ? (
+                    <div className="flex h-[144px] flex-col items-center justify-center text-center">
+                      <p className="typo-meta text-indigo-100/85">
+                        当天暂无带毫升数 (ml) 的奶量记录
+                      </p>
+                      <p className="mt-1 typo-badge text-indigo-200/70">
+                        记一顿配方奶或瓶喂母乳后，将自动展示每顿奶量对比曲线
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* 当天每顿奶量平滑曲线 SVG */}
+                      <svg
+                        viewBox={`0 0 ${svgW} ${svgH}`}
+                        className="h-[148px] w-full select-none"
+                        role="img"
+                        aria-label="当天每顿奶量对比折线图"
                       >
-                        {mlTick}
-                      </text>
-                      <text
-                        x={svgW - padR + 7}
-                        y={y + 3.5}
-                        textAnchor="start"
-                        fontSize="10"
-                        fill="rgba(255,243,205,0.85)"
-                      >
-                        {idx === 0 ? 1 : cntTick}
-                      </text>
-                    </g>
-                  );
-                })}
+                        <defs>
+                          <linearGradient id="dayMilkAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#5cbcff" stopOpacity="0.34" />
+                            <stop offset="100%" stopColor="#5cbcff" stopOpacity="0.02" />
+                          </linearGradient>
+                        </defs>
 
-                {/* 蓝色平滑曲线（奶量） */}
-                <path
-                  d={mlPath}
-                  fill="none"
-                  stroke="#5cbcff"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+                        {/* 横向柔和网格线 + 左侧奶量刻度 */}
+                        {[0, 1 / 3, 2 / 3, 1].map((ratio, idx) => {
+                          const y = padT + plotH * (1 - ratio);
+                          const mlTick = Math.round(maxDayMl * ratio);
+                          return (
+                            <g key={idx}>
+                              <line
+                                x1={padL}
+                                y1={y}
+                                x2={svgW - 14}
+                                y2={y}
+                                stroke="rgba(255,255,255,0.13)"
+                                strokeWidth="0.8"
+                              />
+                              <text
+                                x={padL - 6}
+                                y={y + 3.5}
+                                textAnchor="end"
+                                fontSize="10"
+                                fill="rgba(235,242,255,0.85)"
+                              >
+                                {mlTick}
+                              </text>
+                            </g>
+                          );
+                        })}
 
-                {/* 暖金色平滑曲线（顿数） */}
-                <path
-                  d={countPath}
-                  fill="none"
-                  stroke="#f8cb46"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+                        {/* 多顿均值参考虚线 */}
+                        {dayFeedPoints.length >= 2 && (
+                          <g>
+                            <line
+                              x1={padL}
+                              y1={dayAvgY}
+                              x2={svgW - 14}
+                              y2={dayAvgY}
+                              stroke="rgba(253,224,71,0.45)"
+                              strokeWidth="1"
+                              strokeDasharray="3 3"
+                            />
+                            <text
+                              x={svgW - 15}
+                              y={Math.max(padT + 9, dayAvgY - 4)}
+                              textAnchor="end"
+                              fontSize="9"
+                              fill="rgba(254,240,138,0.88)"
+                            >
+                              均 {dayAvgMilkMl}ml
+                            </text>
+                          </g>
+                        )}
 
-                {/* 数据节点与 X 轴日期（点击切换当日记录） */}
-                {mlPoints.map((pt, idx) => {
-                  const cPt = countPoints[idx];
-                  const isActive = pt.date === selectedDate;
-                  return (
-                    <g
-                      key={pt.date}
-                      onClick={() => {
-                        setSelectedDate(pt.date);
-                        setShowAllRecords(false);
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <circle
-                        cx={pt.x}
-                        cy={pt.y}
-                        r={isActive ? 4.5 : 3.2}
-                        fill="#7dd3fc"
-                        stroke="#ffffff"
-                        strokeWidth="1.2"
-                      />
-                      {/* 金色小星芒节点 */}
-                      <circle
-                        cx={cPt.x}
-                        cy={cPt.y}
-                        r={isActive ? 4.5 : 3.2}
-                        fill="#fde047"
-                        stroke="#fffbeb"
-                        strokeWidth="1"
-                      />
-                      <text
-                        x={pt.x}
-                        y={svgH - 6}
-                        textAnchor="middle"
-                        fontSize="9.5"
-                        fontWeight={isActive ? '700' : '500'}
-                        fill={isActive ? '#fde047' : 'rgba(226,232,240,0.75)'}
-                      >
-                        {pt.short}
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
+                        {/* 渐变面积填充 */}
+                        {dayAreaPath && <path d={dayAreaPath} fill="url(#dayMilkAreaGrad)" />}
+
+                        {/* 蓝色平滑奶量折线 */}
+                        {dayFeedPoints.length >= 2 && (
+                          <path
+                            d={dayFeedPath}
+                            fill="none"
+                            stroke="#5cbcff"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        )}
+
+                        {/* 每一顿数据节点 + 上方毫升数 + 下方时间轴 */}
+                        {dayFeedPoints.map((pt) => {
+                          const isActive = activeDayFeed?.id === pt.id;
+                          return (
+                            <g
+                              key={pt.id}
+                              onClick={() => setSelectedDayFeedId(pt.id)}
+                              className="cursor-pointer"
+                            >
+                              {isActive && (
+                                <circle
+                                  cx={pt.x}
+                                  cy={pt.y}
+                                  r={8}
+                                  fill="rgba(253,224,71,0.22)"
+                                />
+                              )}
+                              <circle
+                                cx={pt.x}
+                                cy={pt.y}
+                                r={isActive ? 4.8 : 3.6}
+                                fill={isActive ? '#fde047' : '#7dd3fc'}
+                                stroke="#ffffff"
+                                strokeWidth="1.4"
+                              />
+                              <text
+                                x={pt.x}
+                                y={Math.max(11, pt.y - 8)}
+                                textAnchor="middle"
+                                fontSize="9.5"
+                                fontWeight={isActive ? '600' : '500'}
+                                fill={isActive ? '#fde047' : '#e0f2fe'}
+                              >
+                                {pt.amountMl}
+                              </text>
+                              <text
+                                x={pt.x}
+                                y={svgH - 6}
+                                textAnchor="middle"
+                                fontSize="9.5"
+                                fontWeight={isActive ? '600' : '400'}
+                                fill={isActive ? '#fde047' : 'rgba(226,232,240,0.78)'}
+                              >
+                                {pt.time}
+                              </text>
+                            </g>
+                          );
+                        })}
+                      </svg>
+
+                      {/* 当前选中顿次读数摘要条 */}
+                      {activeDayFeed && (
+                        <div className="mt-1 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.06] px-2.5 py-1.5 typo-badge text-indigo-100/90">
+                          <span className="truncate">
+                            第 {activeDayFeed.feedIndex} 顿 · {activeDayFeed.time} ·{' '}
+                            {activeDayFeed.type === 'formula' ? '配方奶' : '母乳瓶喂'}
+                          </span>
+                          <span className="shrink-0 font-typewriter typo-num text-amber-200">
+                            {activeDayFeed.amountMl} ml
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* 7天 / 30天 / 90天 图例：总奶量与总顿数对比 */}
+                  <div className="mb-1 flex items-center justify-between pr-6 text-[11.5px] font-medium text-indigo-100/90">
+                    <div className="flex items-center gap-3.5">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#5cbcff] shadow-[0_0_6px_#5cbcff]" />
+                        总奶量 (ml)
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#f8cb46] shadow-[0_0_6px_#f8cb46]" />
+                        总顿数 (次)
+                      </span>
+                    </div>
+                    <span className="font-typewriter text-[11px] text-amber-200/85 tabular-nums">
+                      近{rangeDays}天
+                    </span>
+                  </div>
+
+                  {/* 双 Y 轴平滑曲线 SVG */}
+                  <svg
+                    viewBox={`0 0 ${svgW} ${svgH}`}
+                    className="h-[148px] w-full select-none"
+                    role="img"
+                    aria-label="总奶量与总顿数双Y轴折线图"
+                  >
+                    {/* 横向柔和网格线 + 左右双刻度 */}
+                    {[0, 1 / 3, 2 / 3, 1].map((ratio, idx) => {
+                      const y = padT + plotH * (1 - ratio);
+                      const mlTick = Math.round(maxMl * ratio);
+                      const cntTick = Math.round(maxCount * ratio);
+                      return (
+                        <g key={idx}>
+                          <line
+                            x1={padL}
+                            y1={y}
+                            x2={svgW - padR}
+                            y2={y}
+                            stroke="rgba(255,255,255,0.14)"
+                            strokeWidth="0.8"
+                          />
+                          <text
+                            x={padL - 6}
+                            y={y + 3.5}
+                            textAnchor="end"
+                            fontSize="10"
+                            fill="rgba(235,242,255,0.85)"
+                          >
+                            {mlTick}
+                          </text>
+                          <text
+                            x={svgW - padR + 7}
+                            y={y + 3.5}
+                            textAnchor="start"
+                            fontSize="10"
+                            fill="rgba(255,243,205,0.85)"
+                          >
+                            {cntTick}
+                          </text>
+                        </g>
+                      );
+                    })}
+
+                    {/* 蓝色平滑曲线（总奶量） */}
+                    <path
+                      d={mlPath}
+                      fill="none"
+                      stroke="#5cbcff"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+
+                    {/* 暖金色平滑曲线（总顿数） */}
+                    <path
+                      d={countPath}
+                      fill="none"
+                      stroke="#f8cb46"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+
+                    {/* 数据节点与 X 轴日期（点击切换当日记录） */}
+                    {mlPoints.map((pt, idx) => {
+                      const cPt = countPoints[idx];
+                      const isActive = pt.date === selectedDate;
+                      return (
+                        <g
+                          key={pt.date}
+                          onClick={() => {
+                            setSelectedDate(pt.date);
+                            setShowAllRecords(false);
+                          }}
+                          className="cursor-pointer"
+                        >
+                          <circle
+                            cx={pt.x}
+                            cy={pt.y}
+                            r={isActive ? 4.5 : 3.2}
+                            fill="#7dd3fc"
+                            stroke="#ffffff"
+                            strokeWidth="1.2"
+                          />
+                          {/* 金色小星芒节点 */}
+                          <circle
+                            cx={cPt.x}
+                            cy={cPt.y}
+                            r={isActive ? 4.5 : 3.2}
+                            fill="#fde047"
+                            stroke="#fffbeb"
+                            strokeWidth="1"
+                          />
+                          <text
+                            x={pt.x}
+                            y={svgH - 6}
+                            textAnchor="middle"
+                            fontSize="9.5"
+                            fontWeight={isActive ? '600' : '400'}
+                            fill={isActive ? '#fde047' : 'rgba(226,232,240,0.75)'}
+                          >
+                            {pt.short}
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </svg>
+                </>
+              )}
             </div>
 
             {/* 米白撕纸「⭐ 喂养记录」时间线卡片 */}
