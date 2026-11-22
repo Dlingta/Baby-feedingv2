@@ -30,24 +30,24 @@ function scanFontFiles(dir: string, urlPrefix: string): {url: string; format: st
 }
 
 function buildCustomFontsCss(fontsRoot: string): string {
-  const rootFiles = scanFontFiles(fontsRoot, '/fonts');
-  const namedBody = rootFiles.filter((f) => /^\/fonts\/body\./i.test(decodeURIComponent(f.url)));
-  const namedDisplay = rootFiles.filter((f) => /^\/fonts\/display\./i.test(decodeURIComponent(f.url)));
-  const namedMono = rootFiles.filter((f) => /^\/fonts\/mono\./i.test(decodeURIComponent(f.url)));
+  const rootFiles = scanFontFiles(fontsRoot, '.');
+  const namedBody = rootFiles.filter((f) => /^\.\/body\./i.test(decodeURIComponent(f.url)));
+  const namedDisplay = rootFiles.filter((f) => /^\.\/display\./i.test(decodeURIComponent(f.url)));
+  const namedMono = rootFiles.filter((f) => /^\.\/mono\./i.test(decodeURIComponent(f.url)));
   const fallbackRootBody = rootFiles.filter(
-    (f) => !/^\/fonts\/(display|mono)\./i.test(decodeURIComponent(f.url)),
+    (f) => !/^\.\/(display|mono)\./i.test(decodeURIComponent(f.url)),
   );
 
   const bodyFonts = [
-    ...scanFontFiles(path.join(fontsRoot, 'body'), '/fonts/body'),
+    ...scanFontFiles(path.join(fontsRoot, 'body'), './body'),
     ...(namedBody.length > 0 ? namedBody : fallbackRootBody),
   ];
   const displayFonts = [
-    ...scanFontFiles(path.join(fontsRoot, 'display'), '/fonts/display'),
+    ...scanFontFiles(path.join(fontsRoot, 'display'), './display'),
     ...namedDisplay,
   ];
   const monoFonts = [
-    ...scanFontFiles(path.join(fontsRoot, 'mono'), '/fonts/mono'),
+    ...scanFontFiles(path.join(fontsRoot, 'mono'), './mono'),
     ...namedMono,
   ];
 
@@ -68,6 +68,7 @@ function buildCustomFontsCss(fontsRoot: string): string {
 
 export default defineConfig(() => {
   return {
+    base: './',
     plugins: [
       react(),
       tailwindcss(),
@@ -77,7 +78,7 @@ export default defineConfig(() => {
         configureServer(server) {
           server.middlewares.use((req, res, next) => {
             const reqPath = (req.url || '').split('?')[0];
-            if (reqPath === '/fonts/custom-fonts.css') {
+            if (reqPath.endsWith('/fonts/custom-fonts.css')) {
               const css = buildCustomFontsCss(path.resolve(__dirname, 'public/fonts'));
               res.statusCode = 200;
               res.setHeader('Content-Type', 'text/css; charset=utf-8');

@@ -20,35 +20,35 @@ const NAV_ITEMS: NavItemConfig[] = [
     tab: 'home',
     label: '星球首页',
     slotName: 'tab_planet',
-    iconSrc: '/assets/extracted/nav_planet.png',
+    iconSrc: './assets/extracted/nav_planet.png',
     iconClass: 'h-10 w-auto',
   },
   {
     tab: 'diary',
     label: '日记本',
     slotName: 'tab_diary',
-    iconSrc: '/assets/extracted/nav_diary.png',
+    iconSrc: './assets/extracted/nav_diary.png',
     iconClass: 'h-9 w-auto',
   },
   {
     tab: 'feeding',
     label: '喂养',
     slotName: 'tab_feeding',
-    iconSrc: '/assets/extracted/nav_feeding.png',
+    iconSrc: './assets/extracted/nav_feeding.png',
     iconClass: 'h-9 w-auto',
   },
   {
     tab: 'growth',
     label: '观测坐标',
     slotName: 'tab_growth',
-    iconSrc: '/assets/extracted/icon_sprout.png',
+    iconSrc: './assets/extracted/icon_sprout.png',
     iconClass: 'h-9 w-auto',
   },
   {
     tab: 'health',
     label: '治愈工坊',
     slotName: 'tab_health',
-    iconSrc: '/assets/extracted/nav_health.png',
+    iconSrc: './assets/extracted/nav_health.png',
     iconClass: 'h-9 w-auto',
   },
 ];
@@ -78,7 +78,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         {['left-[20%]', 'left-[40%]', 'left-[60%]', 'left-[80%]'].map((pos) => (
           <img
             key={pos}
-            src="/assets/extracted/nav_mid_star.png"
+            src="./assets/extracted/nav_mid_star.png"
             alt=""
             className={`absolute ${pos} top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-[0_0_5px_rgba(253,224,71,0.75)]`}
           />

@@ -147,7 +147,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
             className="flex items-center gap-1.5 text-[12.5px] font-bold text-[#25324e]"
           >
             <img
-              src="/assets/extracted/growth_icon_ruler.png"
+              src="./assets/extracted/growth_icon_ruler.png"
               alt=""
               aria-hidden="true"
               className="h-4 w-4 object-contain"
@@ -224,7 +224,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
             className="flex items-center gap-1.5 text-[12.5px] font-bold text-[#25324e]"
           >
             <img
-              src="/assets/extracted/growth_icon_scale.png"
+              src="./assets/extracted/growth_icon_scale.png"
               alt=""
               aria-hidden="true"
               className="h-4 w-4 object-contain"
@@ -261,7 +261,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
             className="flex items-center gap-1.5 text-[12.5px] font-bold text-[#25324e]"
           >
             <img
-              src="/assets/extracted/growth_icon_tape.png"
+              src="./assets/extracted/growth_icon_tape.png"
               alt=""
               aria-hidden="true"
               className="h-4 w-4 object-contain"

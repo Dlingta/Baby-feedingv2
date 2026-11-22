@@ -42,7 +42,7 @@ export const GrowthHistory: React.FC<GrowthHistoryProps> = ({
       <div className="mb-2 flex items-center justify-between gap-2 px-0.5">
         <div className="flex items-center gap-1.5">
           <img
-            src="/assets/extracted/health_icon_calendar.png"
+            src="./assets/extracted/health_icon_calendar.png"
             alt=""
             aria-hidden="true"
             className="h-4.5 w-4.5 object-contain"
@@ -94,7 +94,7 @@ export const GrowthHistory: React.FC<GrowthHistoryProps> = ({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5 typo-meta">
                       <img
-                        src="/assets/extracted/health_star_small.png"
+                        src="./assets/extracted/health_star_small.png"
                         alt=""
                         aria-hidden="true"
                         className="h-3.5 w-3.5 shrink-0 object-contain"

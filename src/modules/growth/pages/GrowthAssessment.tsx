@@ -86,7 +86,7 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-52 opacity-45"
         style={{
-          backgroundImage: 'url(/assets/aistudio/____f8d9ecf9.png)',
+          backgroundImage: 'url(./assets/aistudio/____f8d9ecf9.png)',
           backgroundSize: 'cover',
           backgroundPosition: 'top center',
           WebkitMaskImage: 'linear-gradient(to bottom, black 35%, transparent 100%)',
@@ -165,7 +165,7 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
               <img
-                src="/assets/extracted/health_star_small.png"
+                src="./assets/extracted/health_star_small.png"
                 alt=""
                 aria-hidden="true"
                 className="h-5 w-5 object-contain"
@@ -287,7 +287,7 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <img
-                src="/assets/extracted/growth_icon_tape.png"
+                src="./assets/extracted/growth_icon_tape.png"
                 alt=""
                 aria-hidden="true"
                 className="h-6 w-6 object-contain"
@@ -348,7 +348,7 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <img
-                src="/assets/extracted/health_icon_calendar.png"
+                src="./assets/extracted/health_icon_calendar.png"
                 alt=""
                 aria-hidden="true"
                 className="h-4.5 w-4.5 object-contain"
@@ -372,7 +372,7 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
               >
                 <div className="flex items-center justify-center gap-1 typo-meta font-semibold">
                   <img
-                    src="/assets/extracted/health_star_small.png"
+                    src="./assets/extracted/health_star_small.png"
                     alt=""
                     aria-hidden="true"
                     className={`h-3.5 w-3.5 object-contain ${

@@ -18,18 +18,18 @@ interface DiaryScreenProps {
 }
 
 const MOOD_OPTIONS: { id: DiaryMood; label: string; sub: string; iconSrc: string }[] = [
-  { id: 'glowing', label: '发光', sub: '(开心)', iconSrc: '/assets/extracted/diary_mood_1.png' },
-  { id: 'floating', label: '漂浮', sub: '(安静)', iconSrc: '/assets/extracted/diary_mood_2.png' },
-  { id: 'soft', label: '潜水', sub: '(熟睡)', iconSrc: '/assets/extracted/diary_mood_3.png' },
-  { id: 'exploring', label: '起风了', sub: '(闹腾)', iconSrc: '/assets/extracted/diary_mood_4.png' },
-  { id: 'full', label: '下雨了', sub: '(哭闹)', iconSrc: '/assets/extracted/diary_mood_5.png' },
+  { id: 'glowing', label: '发光', sub: '(开心)', iconSrc: './assets/extracted/diary_mood_1.png' },
+  { id: 'floating', label: '漂浮', sub: '(安静)', iconSrc: './assets/extracted/diary_mood_2.png' },
+  { id: 'soft', label: '潜水', sub: '(熟睡)', iconSrc: './assets/extracted/diary_mood_3.png' },
+  { id: 'exploring', label: '起风了', sub: '(闹腾)', iconSrc: './assets/extracted/diary_mood_4.png' },
+  { id: 'full', label: '下雨了', sub: '(哭闹)', iconSrc: './assets/extracted/diary_mood_5.png' },
 ];
 
 const WEATHER_OPTIONS: { id: DiaryWeather; label: string; iconSrc: string }[] = [
-  { id: 'sunny', label: '晴朗', iconSrc: '/assets/extracted/diary_weather_sun.png' },
-  { id: 'cloudy', label: '多云', iconSrc: '/assets/extracted/diary_weather_cloud.png' },
-  { id: 'rainy', label: '小雨', iconSrc: '/assets/extracted/diary_weather_rain.png' },
-  { id: 'starry', label: '星夜', iconSrc: '/assets/extracted/icon_star.png' },
+  { id: 'sunny', label: '晴朗', iconSrc: './assets/extracted/diary_weather_sun.png' },
+  { id: 'cloudy', label: '多云', iconSrc: './assets/extracted/diary_weather_cloud.png' },
+  { id: 'rainy', label: '小雨', iconSrc: './assets/extracted/diary_weather_rain.png' },
+  { id: 'starry', label: '星夜', iconSrc: './assets/extracted/icon_star.png' },
 ];
 
 const SAMPLE_DICTATIONS = [
@@ -41,7 +41,7 @@ const SAMPLE_DICTATIONS = [
 function getWeatherSrc(weather: DiaryWeather): string {
   return (
     WEATHER_OPTIONS.find((w) => w.id === weather)?.iconSrc ??
-    '/assets/extracted/diary_weather_sun.png'
+    './assets/extracted/diary_weather_sun.png'
   );
 }
 
@@ -188,7 +188,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
       {/* 宇宙星空背景层 */}
       <div
         className="pointer-events-none absolute inset-0 bg-cover bg-top opacity-75"
-        style={{ backgroundImage: "url('/assets/aistudio/____f8d9ecf9.png')" }}
+        style={{ backgroundImage: "url('./assets/aistudio/____f8d9ecf9.png')" }}
         aria-hidden="true"
       />
       <div
@@ -453,7 +453,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
             {/* 底部落草小男孩与巴哥犬手绘插画 (紧贴纸卡下沿) */}
             <div className="pointer-events-none -mx-2 -mb-[14px] mt-2 flex justify-center">
               <img
-                src="/assets/extracted/diary_hero_net.png"
+                src="./assets/extracted/diary_hero_net.png"
                 alt="小男孩与巴哥犬"
                 referrerPolicy="no-referrer"
                 className="w-[88%] max-w-[290px] object-contain"
@@ -644,7 +644,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
                     type="button"
                     onClick={() =>
                       setFormPhotos((prev) =>
-                        prev.length < 9 ? [...prev, '/assets/extracted/diary_photo_cat.png'] : prev
+                        prev.length < 9 ? [...prev, './assets/extracted/diary_photo_cat.png'] : prev
                       )
                     }
                     className="text-[11px] font-semibold text-amber-800 underline underline-offset-2"
@@ -671,7 +671,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
                       aria-label="添加图片"
                     >
                       <img
-                        src="/assets/extracted/diary_photo_add.png"
+                        src="./assets/extracted/diary_photo_add.png"
                         alt="添加图片"
                         referrerPolicy="no-referrer"
                         className="h-full w-full object-contain"
@@ -729,7 +729,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
           <div className="diary-paper-card flex w-full max-w-[310px] flex-col items-center px-4 py-6">
             <AssetSlot slotName="empty_diary_net" showSlotTag={showSlotTag}>
               <img
-                src="/assets/extracted/diary_hero_net.png"
+                src="./assets/extracted/diary_hero_net.png"
                 alt="小男孩拿捕虫网网星星与巴哥犬"
                 referrerPolicy="no-referrer"
                 className="h-44 w-auto object-contain"
@@ -771,7 +771,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
                 className="pointer-events-none absolute -bottom-[15px] -left-[4px] z-10 w-[56%] max-w-[205px]"
               >
                 <img
-                  src="/assets/extracted/diary_hero_net.png"
+                  src="./assets/extracted/diary_hero_net.png"
                   alt="手拿捕星网的小男孩与巴哥犬"
                   referrerPolicy="no-referrer"
                   className="w-full h-auto drop-shadow-[0_4px_10px_rgba(32,20,6,0.18)] transition-transform duration-300 group-hover:scale-[1.02]"
@@ -819,7 +819,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
               {filteredDiaries.map((entry) => {
                 const age = calculatePlanetAge(state.profile.birthDate, entry.date);
                 const isSelected = activeDetail?.id === entry.id;
-                const thumb = entry.photos[0] || '/assets/extracted/diary_photo_cat.png';
+                const thumb = entry.photos[0] || './assets/extracted/diary_photo_cat.png';
                 const previewText = entry.content.replace(/\n/g, '');
 
                 return (

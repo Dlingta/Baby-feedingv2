@@ -212,7 +212,7 @@ b {
   border-radius: 22px;
   border-style: solid;
   border-width: 14px;
-  border-image-source: url('/assets/extracted/diary_paper_clean.png');
+  border-image-source: var(--diary-paper-url, url('./assets/extracted/diary_paper_clean.png'));
   border-image-slice: 44 fill;
   border-image-width: 18px;
   border-image-repeat: stretch;

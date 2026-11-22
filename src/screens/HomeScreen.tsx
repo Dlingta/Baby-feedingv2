@@ -168,7 +168,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <div className="relative w-full aspect-[941/1490] shrink-0 overflow-hidden select-none">
         {/* Layer 1: 宇宙星空背景 (顶部星星、左侧土星、右上发光大星星；渐隐原图底部地球防重影) */}
         <img
-          src="/assets/aistudio/____f8d9ecf9.png"
+          src="./assets/aistudio/____f8d9ecf9.png"
           alt="宇宙星空"
           referrerPolicy="no-referrer"
           style={{
@@ -180,7 +180,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {/* Layer 2: 地球地平线 + 大树 + 云朵 + 花草 */}
         <img
-          src="/assets/aistudio/___19d5e708.png"
+          src="./assets/aistudio/___19d5e708.png"
           alt="星球树木与地球花草"
           referrerPolicy="no-referrer"
           style={{
@@ -197,7 +197,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           className="pointer-events-none absolute left-[71.8%] top-[19.5%] z-20 w-[24.7%]"
         >
           <img
-            src="/assets/extracted/tabby_cat.png"
+            src="./assets/extracted/tabby_cat.png"
             alt="树上够星星的狸花猫"
             referrerPolicy="no-referrer"
             className="w-full h-auto drop-shadow-[0_6px_12px_rgba(0,0,0,0.35)]"
@@ -211,7 +211,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           className="pointer-events-none absolute left-[35.4%] top-[41.4%] z-20 w-[29.2%]"
         >
           <img
-            src="/assets/extracted/boy_wanderer.png"
+            src="./assets/extracted/boy_wanderer.png"
             alt="黄衣小漫游者"
             referrerPolicy="no-referrer"
             className="w-full h-auto drop-shadow-[0_8px_16px_rgba(0,0,0,0.38)]"
@@ -224,7 +224,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           className="pointer-events-none absolute left-[16.5%] top-[53.0%] z-30 w-[23.9%]"
         >
           <img
-            src="/assets/extracted/pug.png"
+            src="./assets/extracted/pug.png"
             alt="仰望小主人的巴哥犬"
             referrerPolicy="no-referrer"
             className="w-full h-auto drop-shadow-[0_8px_14px_rgba(0,0,0,0.42)]"
@@ -237,7 +237,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           className="pointer-events-none absolute left-[55.8%] top-[59.3%] z-30 w-[26%]"
         >
           <img
-            src="/assets/extracted/orange_cat.png"
+            src="./assets/extracted/orange_cat.png"
             alt="熟睡的小橘猫"
             referrerPolicy="no-referrer"
             className="w-full h-auto drop-shadow-[0_8px_12px_rgba(0,0,0,0.4)]"
@@ -442,7 +442,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <AssetSlot slotName="paper_summary_card" showSlotTag={showSlotTag}>
             <div className="relative w-full select-none">
               <img
-                src="/assets/extracted/paper_summary_card_dynamic.png"
+                src="./assets/extracted/paper_summary_card_dynamic.png"
                 alt="今日星光、喂养与坐标摘要卡片"
                 referrerPolicy="no-referrer"
                 className="pointer-events-none w-full h-auto drop-shadow-[0_10px_22px_rgba(3,8,24,0.45)]"

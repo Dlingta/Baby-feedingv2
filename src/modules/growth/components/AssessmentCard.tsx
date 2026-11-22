@@ -8,10 +8,10 @@ interface AssessmentCardProps {
 }
 
 const ICON_MAP: Record<IndicatorEvaluation['key'], string> = {
-  WAZ: '/assets/extracted/growth_icon_scale.png',
-  LAZ: '/assets/extracted/growth_icon_ruler.png',
-  WLZ: '/assets/extracted/growth_icon_tape.png',
-  BMIZ: '/assets/extracted/growth_icon_bmi.png',
+  WAZ: './assets/extracted/growth_icon_scale.png',
+  LAZ: './assets/extracted/growth_icon_ruler.png',
+  WLZ: './assets/extracted/growth_icon_tape.png',
+  BMIZ: './assets/extracted/growth_icon_bmi.png',
 };
 
 export function getSeverityBadgeClass(severity: EvaluationSeverity): string {

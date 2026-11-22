@@ -774,7 +774,7 @@ export const GrowthChart: React.FC<GrowthChartProps> = ({
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1">
             <img
-              src="/assets/extracted/health_star_small.png"
+              src="./assets/extracted/health_star_small.png"
               alt=""
               aria-hidden="true"
               className="h-3.5 w-3.5 object-contain"
@@ -803,7 +803,7 @@ export const GrowthChart: React.FC<GrowthChartProps> = ({
           <div className="flex items-center justify-between gap-2 border-b border-dashed border-[#e2d3b8] pb-2">
             <div className="flex items-center gap-1.5 min-w-0">
               <img
-                src="/assets/extracted/health_star_small.png"
+                src="./assets/extracted/health_star_small.png"
                 alt=""
                 aria-hidden="true"
                 className="h-4 w-4 shrink-0 object-contain"

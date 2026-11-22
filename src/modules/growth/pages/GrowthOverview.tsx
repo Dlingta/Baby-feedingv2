@@ -115,7 +115,7 @@ export const GrowthOverview: React.FC<GrowthOverviewProps> = ({
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-56 opacity-45"
         style={{
-          backgroundImage: 'url(/assets/aistudio/____f8d9ecf9.png)',
+          backgroundImage: 'url(./assets/aistudio/____f8d9ecf9.png)',
           backgroundSize: 'cover',
           backgroundPosition: 'top center',
           WebkitMaskImage: 'linear-gradient(to bottom, black 35%, transparent 100%)',
@@ -125,13 +125,13 @@ export const GrowthOverview: React.FC<GrowthOverviewProps> = ({
 
       {/* 底部左右花草装饰（限定在滚动内容底部，不遮挡固定底栏） */}
       <img
-        src="/assets/extracted/health_footer_flowers.png"
+        src="./assets/extracted/health_footer_flowers.png"
         alt=""
         aria-hidden="true"
         className="pointer-events-none absolute bottom-0 right-0 z-0 w-32 opacity-70"
       />
       <img
-        src="/assets/extracted/health_footer_flowers.png"
+        src="./assets/extracted/health_footer_flowers.png"
         alt=""
         aria-hidden="true"
         className="pointer-events-none absolute bottom-0 left-0 z-0 w-32 -scale-x-100 opacity-70"
@@ -322,7 +322,7 @@ export const GrowthOverview: React.FC<GrowthOverviewProps> = ({
           <div className="flex items-center justify-between gap-2 pb-2">
             <div className="flex items-center gap-1.5">
               <img
-                src="/assets/extracted/health_star_small.png"
+                src="./assets/extracted/health_star_small.png"
                 alt=""
                 aria-hidden="true"
                 className="h-4.5 w-4.5 object-contain"

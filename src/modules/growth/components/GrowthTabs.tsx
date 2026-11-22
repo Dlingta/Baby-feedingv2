@@ -16,19 +16,19 @@ const TAB_ITEMS: {
     key: 'heightCm',
     label: '身高',
     unit: 'cm',
-    iconSrc: '/assets/extracted/icon_star.png',
+    iconSrc: './assets/extracted/icon_star.png',
   },
   {
     key: 'weightKg',
     label: '体重',
     unit: 'kg',
-    iconSrc: '/assets/extracted/icon_bottle.png',
+    iconSrc: './assets/extracted/icon_bottle.png',
   },
   {
     key: 'headCm',
     label: '头围',
     unit: 'cm',
-    iconSrc: '/assets/extracted/growth_icon_tape.png',
+    iconSrc: './assets/extracted/growth_icon_tape.png',
   },
 ];
 

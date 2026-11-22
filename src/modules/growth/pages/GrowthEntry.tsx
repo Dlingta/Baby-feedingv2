@@ -24,7 +24,7 @@ export const GrowthEntry: React.FC<GrowthEntryProps> = ({
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-52 opacity-45"
         style={{
-          backgroundImage: 'url(/assets/aistudio/____f8d9ecf9.png)',
+          backgroundImage: 'url(./assets/aistudio/____f8d9ecf9.png)',
           backgroundSize: 'cover',
           backgroundPosition: 'top center',
           WebkitMaskImage: 'linear-gradient(to bottom, black 35%, transparent 100%)',
@@ -53,13 +53,13 @@ export const GrowthEntry: React.FC<GrowthEntryProps> = ({
 
           <div className="pointer-events-none relative flex shrink-0 items-end">
             <img
-              src="/assets/extracted/pug.png"
+              src="./assets/extracted/pug.png"
               alt="仰望小主人的巴哥犬"
               referrerPolicy="no-referrer"
               className="-mr-4 mb-1 h-[62px] w-auto object-contain drop-shadow-[0_6px_12px_rgba(3,8,24,0.45)]"
             />
             <img
-              src="/assets/extracted/boy_wanderer.png"
+              src="./assets/extracted/boy_wanderer.png"
               alt="黄色星星帽小漫游者"
               referrerPolicy="no-referrer"
               className="h-[88px] w-auto object-contain drop-shadow-[0_8px_16px_rgba(3,8,24,0.48)]"
@@ -70,7 +70,7 @@ export const GrowthEntry: React.FC<GrowthEntryProps> = ({
         {/* 奶油色手撕纸录入表单卡片 */}
         <div className="diary-paper-card relative z-20 min-w-0 px-2.5 py-3">
           <img
-            src="/assets/extracted/health_star_big.png"
+            src="./assets/extracted/health_star_big.png"
             alt=""
             aria-hidden="true"
             className="pointer-events-none absolute -right-2 -top-4 z-30 h-8 w-8 object-contain drop-shadow-[0_0_10px_rgba(253,224,71,0.85)]"

@@ -32,6 +32,27 @@ const PREVIEW_FRAME_CLASS: Record<PreviewWidthPreset, string> = {
   430: 'lg:w-[442px] lg:h-[776px]',
 };
 
+const normalizeAssetPath = (url: string): string =>
+  url.startsWith('/assets/') ? `.${url}` : url;
+
+const normalizeStateAssetPaths = (appState: PlanetAppState): PlanetAppState => ({
+  ...appState,
+  diaries: Array.isArray(appState.diaries)
+    ? appState.diaries.map((d) => ({
+        ...d,
+        photos: Array.isArray(d.photos) ? d.photos.map(normalizeAssetPath) : d.photos,
+      }))
+    : appState.diaries,
+  illnesses: Array.isArray(appState.illnesses)
+    ? appState.illnesses.map((item) => ({
+        ...item,
+        casePhotos: Array.isArray(item.casePhotos)
+          ? item.casePhotos.map(normalizeAssetPath)
+          : item.casePhotos,
+      }))
+    : appState.illnesses,
+});
+
 export default function App() {
   const [state, setState] = useState<PlanetAppState>(() => {
     const todayStr = getTodayDateStr();
@@ -61,18 +82,22 @@ export default function App() {
           // 若仍保留旧版占位日记示例图或旧基准日期，平滑升级为新版手绘日记与实时日期
           if (Array.isArray(parsed.diaries)) {
             const legacyPaths = new Set([
-              '/assets/extracted/orange_cat.png',
-              '/assets/aistudio/____f8d9ecf9.png',
-              '/assets/aistudio/___f4298ab8.png',
+              './assets/extracted/orange_cat.png',
+              './assets/aistudio/____f8d9ecf9.png',
+              './assets/aistudio/___f4298ab8.png',
             ]);
             parsed.diaries = parsed.diaries.map((d) => {
+              const normalizedPhotos = Array.isArray(d.photos)
+                ? d.photos.map(normalizeAssetPath)
+                : d.photos;
               const fresh = freshInit.diaries.find((init) => init.id === d.id);
-              if (!fresh) return d;
-              if (d.photos?.[0] && legacyPaths.has(d.photos[0])) {
+              if (!fresh) return { ...d, photos: normalizedPhotos };
+              if (normalizedPhotos?.[0] && legacyPaths.has(normalizedPhotos[0])) {
                 return fresh;
               }
               return {
                 ...d,
+                photos: normalizedPhotos,
                 date: isLegacyDate(d.date) ? fresh.date : d.date,
                 reflection: d.reflection || fresh.reflection,
               };
@@ -591,7 +616,7 @@ export default function App() {
                 onUpdateProfile={handleUpdateProfile}
                 onImportState={(nextState) => {
                   setHomeForceEmpty(false);
-                  setState(nextState);
+                  setState(normalizeStateAssetPaths(nextState));
                 }}
               />
             )}

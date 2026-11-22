@@ -28,7 +28,7 @@ export const AssetSlot: React.FC<SlotBadgeProps> = ({
 
 export const IconStar: React.FC<{ className?: string }> = ({ className = 'w-6 h-6' }) => (
   <img
-    src="/assets/extracted/icon_star.png"
+    src="./assets/extracted/icon_star.png"
     alt=""
     aria-hidden="true"
     referrerPolicy="no-referrer"
@@ -38,7 +38,7 @@ export const IconStar: React.FC<{ className?: string }> = ({ className = 'w-6 h-
 
 export const IconBottle: React.FC<{ className?: string }> = ({ className = 'w-6 h-6' }) => (
   <img
-    src="/assets/extracted/icon_bottle.png"
+    src="./assets/extracted/icon_bottle.png"
     alt=""
     aria-hidden="true"
     referrerPolicy="no-referrer"
@@ -48,7 +48,7 @@ export const IconBottle: React.FC<{ className?: string }> = ({ className = 'w-6 
 
 export const IconSprout: React.FC<{ className?: string }> = ({ className = 'w-6 h-6' }) => (
   <img
-    src="/assets/extracted/icon_sprout.png"
+    src="./assets/extracted/icon_sprout.png"
     alt=""
     aria-hidden="true"
     referrerPolicy="no-referrer"
@@ -58,7 +58,7 @@ export const IconSprout: React.FC<{ className?: string }> = ({ className = 'w-6 
 
 export const IconShield: React.FC<{ className?: string }> = ({ className = 'w-6 h-6' }) => (
   <img
-    src="/assets/extracted/icon_shield.png"
+    src="./assets/extracted/icon_shield.png"
     alt=""
     aria-hidden="true"
     referrerPolicy="no-referrer"

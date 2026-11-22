@@ -121,12 +121,12 @@ function isFeverLike(rec: IllnessRecord): boolean {
 function getDiseaseIconSrc(rec: IllnessRecord): string {
   const label = getDiseaseLabel(rec);
   if (label.includes('烧') || label.includes('热') || label.includes('体温')) {
-    return '/assets/extracted/health_thermometer.png';
+    return './assets/extracted/health_thermometer.png';
   }
   if (label.includes('感冒') || label.includes('咳') || label.includes('腹泻')) {
-    return '/assets/extracted/health_medicine_bottle.png';
+    return './assets/extracted/health_medicine_bottle.png';
   }
-  return '/assets/extracted/health_firstaid_kit.png';
+  return './assets/extracted/health_firstaid_kit.png';
 }
 
 export const HealthScreen: React.FC<HealthScreenProps> = ({
@@ -420,7 +420,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-56 opacity-45"
         style={{
-          backgroundImage: 'url(/assets/aistudio/____f8d9ecf9.png)',
+          backgroundImage: 'url(./assets/aistudio/____f8d9ecf9.png)',
           backgroundSize: 'cover',
           backgroundPosition: 'top center',
           WebkitMaskImage: 'linear-gradient(to bottom, black 35%, transparent 100%)',
@@ -430,13 +430,13 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
 
       {/* 底部左右花草星球装饰边（限定在滚动页面底部，不覆盖固定底栏） */}
       <img
-        src="/assets/extracted/health_footer_flowers.png"
+        src="./assets/extracted/health_footer_flowers.png"
         alt=""
         aria-hidden="true"
         className="pointer-events-none absolute bottom-0 right-0 z-0 w-36 opacity-80"
       />
       <img
-        src="/assets/extracted/health_footer_flowers.png"
+        src="./assets/extracted/health_footer_flowers.png"
         alt=""
         aria-hidden="true"
         className="pointer-events-none absolute bottom-0 left-0 z-0 w-36 -scale-x-100 opacity-80"
@@ -528,7 +528,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                 <div className="pb-6 pl-1">
                   <div className="flex items-center gap-1.5">
                     <img
-                      src="/assets/extracted/health_shield_gold.png"
+                      src="./assets/extracted/health_shield_gold.png"
                       alt=""
                       aria-hidden="true"
                       className="h-9 w-8 object-contain drop-shadow-[0_0_12px_rgba(253,224,71,0.65)]"
@@ -555,7 +555,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
 
                 <AssetSlot slotName="health_boy_pug_shield" showSlotTag={showSlotTag} className="shrink-0">
                   <img
-                    src="/assets/extracted/health_boy_pug_shield.png"
+                    src="./assets/extracted/health_boy_pug_shield.png"
                     alt="手持护盾的小漫游者与巴哥犬"
                     referrerPolicy="no-referrer"
                     className="h-[118px] w-auto object-contain drop-shadow-[0_8px_16px_rgba(3,8,24,0.45)]"
@@ -605,10 +605,10 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                       <img
                         src={
                           isActivated
-                            ? '/assets/extracted/health_shield_green.png'
+                            ? './assets/extracted/health_shield_green.png'
                             : isNext
-                            ? '/assets/extracted/health_vial_blue.png'
-                            : '/assets/extracted/health_vial_locked.png'
+                            ? './assets/extracted/health_vial_blue.png'
+                            : './assets/extracted/health_vial_locked.png'
                         }
                         alt=""
                         referrerPolicy="no-referrer"
@@ -647,7 +647,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                         <span className="relative inline-flex items-center gap-1 rounded-full bg-gradient-to-b from-[#ffe25e] to-[#f4b21d] px-2.5 py-1 typo-badge font-semibold text-[#2a1f07] shadow-[0_2px_8px_rgba(244,178,29,0.45)]">
                           <span>下一针</span>
                           <img
-                            src="/assets/extracted/health_star_small.png"
+                            src="./assets/extracted/health_star_small.png"
                             alt=""
                             aria-hidden="true"
                             className="h-3.5 w-3.5 object-contain"
@@ -699,7 +699,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               className="flex min-h-[48px] w-[78%] items-center justify-center gap-2 rounded-full border-2 border-[#fff0a6]/85 bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] px-6 typo-cta text-[#241b09] shadow-[0_8px_22px_rgba(244,179,30,0.45),inset_0_2px_2px_rgba(255,255,255,0.65)] transition-transform hover:brightness-105 active:scale-[0.97]"
             >
               <img
-                src="/assets/extracted/health_icon_calendar.png"
+                src="./assets/extracted/health_icon_calendar.png"
                 alt=""
                 aria-hidden="true"
                 className="h-4.5 w-4.5 object-contain"
@@ -729,7 +729,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               <div className="pb-6 pl-1">
                 <div className="flex items-center gap-1.5">
                   <img
-                    src="/assets/extracted/health_shield_gold.png"
+                    src="./assets/extracted/health_shield_gold.png"
                     alt=""
                     aria-hidden="true"
                     className="h-9 w-8 object-contain drop-shadow-[0_0_12px_rgba(253,224,71,0.65)]"
@@ -752,7 +752,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
             </div>
 
             <img
-              src="/assets/extracted/health_boy_pug_shield.png"
+              src="./assets/extracted/health_boy_pug_shield.png"
               alt="持盾小漫游者与巴哥犬"
               referrerPolicy="no-referrer"
               className="h-[112px] w-auto object-contain drop-shadow-[0_8px_16px_rgba(3,8,24,0.45)]"
@@ -762,13 +762,13 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
           {/* 撕纸表单卡片 + 右上角双闪星 */}
           <div className="diary-paper-card relative z-20 px-2.5 py-3">
             <img
-              src="/assets/extracted/health_star_big.png"
+              src="./assets/extracted/health_star_big.png"
               alt=""
               aria-hidden="true"
               className="pointer-events-none absolute -right-2 -top-4 z-30 h-9 w-9 object-contain drop-shadow-[0_0_10px_rgba(253,224,71,0.85)]"
             />
             <img
-              src="/assets/extracted/health_star_small.png"
+              src="./assets/extracted/health_star_small.png"
               alt=""
               aria-hidden="true"
               className="pointer-events-none absolute right-2 top-5 z-30 h-5 w-5 object-contain drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"
@@ -777,7 +777,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
             {/* 表单标题头 */}
             <div className="flex items-center gap-2.5 pb-3">
               <img
-                src="/assets/extracted/health_vial_blue.png"
+                src="./assets/extracted/health_vial_blue.png"
                 alt=""
                 aria-hidden="true"
                 className="h-10 w-10 shrink-0 object-contain"
@@ -793,7 +793,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               <div>
                 <div className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-bold text-[#25324e]">
                   <img
-                    src="/assets/extracted/health_star_small.png"
+                    src="./assets/extracted/health_star_small.png"
                     alt=""
                     aria-hidden="true"
                     className="h-3.5 w-3.5 object-contain"
@@ -805,8 +805,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                     <img
                       src={
                         activeDose.status === 'activated'
-                          ? '/assets/extracted/health_shield_green.png'
-                          : '/assets/extracted/health_shield_gold.png'
+                          ? './assets/extracted/health_shield_green.png'
+                          : './assets/extracted/health_shield_gold.png'
                       }
                       alt=""
                       aria-hidden="true"
@@ -837,7 +837,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               <div>
                 <div className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-bold text-[#25324e]">
                   <img
-                    src="/assets/extracted/health_star_small.png"
+                    src="./assets/extracted/health_star_small.png"
                     alt=""
                     aria-hidden="true"
                     className="h-3.5 w-3.5 object-contain"
@@ -869,7 +869,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               <div>
                 <div className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-bold text-[#25324e]">
                   <img
-                    src="/assets/extracted/health_star_small.png"
+                    src="./assets/extracted/health_star_small.png"
                     alt=""
                     aria-hidden="true"
                     className="h-3.5 w-3.5 object-contain"
@@ -901,7 +901,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               <div className="flex items-center justify-between gap-2.5 pt-0.5">
                 <div className="flex shrink-0 items-center gap-1.5 text-[12.5px] font-bold text-[#25324e]">
                   <img
-                    src="/assets/extracted/health_star_small.png"
+                    src="./assets/extracted/health_star_small.png"
                     alt=""
                     aria-hidden="true"
                     className="h-3.5 w-3.5 object-contain"
@@ -911,7 +911,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                 <label className="relative flex flex-1 cursor-pointer items-center justify-between rounded-2xl border border-[#e3d5be] bg-[#faf4e8] px-3 py-2">
                   <div className="flex items-center gap-2">
                     <img
-                      src="/assets/extracted/health_icon_calendar.png"
+                      src="./assets/extracted/health_icon_calendar.png"
                       alt=""
                       aria-hidden="true"
                       className="h-4.5 w-4.5 object-contain"
@@ -937,7 +937,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               <div>
                 <div className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-bold text-[#25324e]">
                   <img
-                    src="/assets/extracted/health_thermometer.png"
+                    src="./assets/extracted/health_thermometer.png"
                     alt=""
                     aria-hidden="true"
                     className="h-4 w-3.5 object-contain"
@@ -988,7 +988,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                   className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-full border border-[#fff0a6] bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] typo-cta text-[#241b09] shadow-[0_6px_16px_rgba(244,179,30,0.42),inset_0_1.5px_1.5px_rgba(255,255,255,0.65)] transition-transform active:scale-95"
                 >
                   <img
-                    src="/assets/extracted/health_star_small.png"
+                    src="./assets/extracted/health_star_small.png"
                     alt=""
                     aria-hidden="true"
                     className="h-4 w-4 object-contain"
@@ -1071,7 +1071,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                 </p>
                 <AssetSlot slotName="health_sleeping_baby_cat" showSlotTag={showSlotTag}>
                   <img
-                    src="/assets/extracted/health_sleeping_baby_cat.png"
+                    src="./assets/extracted/health_sleeping_baby_cat.png"
                     alt="被窝里熟睡的小宝贝与橘猫"
                     referrerPolicy="no-referrer"
                     className="h-[154px] w-auto max-w-full object-contain drop-shadow-[0_8px_18px_rgba(3,8,24,0.45)]"
@@ -1376,7 +1376,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
             <div className="pb-6 pl-1">
               <div className="flex items-center gap-1.5">
                 <img
-                  src="/assets/extracted/health_firstaid_kit.png"
+                  src="./assets/extracted/health_firstaid_kit.png"
                   alt=""
                   aria-hidden="true"
                   className="h-8 w-8 object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.45)]"
@@ -1399,7 +1399,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
             </div>
 
             <img
-              src="/assets/extracted/health_boy_pug_shield.png"
+              src="./assets/extracted/health_boy_pug_shield.png"
               alt="守护小漫游者与巴哥犬"
               referrerPolicy="no-referrer"
               className="h-[112px] w-auto object-contain drop-shadow-[0_8px_16px_rgba(3,8,24,0.45)]"
@@ -1409,13 +1409,13 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
           {/* 撕纸新建生病记录与病历表单卡片 + 右上角双闪星 */}
           <div className="diary-paper-card relative z-20 px-2.5 py-3">
             <img
-              src="/assets/extracted/health_star_big.png"
+              src="./assets/extracted/health_star_big.png"
               alt=""
               aria-hidden="true"
               className="pointer-events-none absolute -right-2 -top-4 z-30 h-9 w-9 object-contain drop-shadow-[0_0_10px_rgba(253,224,71,0.85)]"
             />
             <img
-              src="/assets/extracted/health_star_small.png"
+              src="./assets/extracted/health_star_small.png"
               alt=""
               aria-hidden="true"
               className="pointer-events-none absolute right-2 top-5 z-30 h-5 w-5 object-contain drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"
@@ -1426,12 +1426,12 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               <img
                 src={
                   selectedDiseaseTag === '发烧' || selectedDiseaseTag === '体温异常'
-                    ? '/assets/extracted/health_thermometer.png'
+                    ? './assets/extracted/health_thermometer.png'
                     : selectedDiseaseTag === '感冒' ||
                       selectedDiseaseTag === '咳嗽' ||
                       selectedDiseaseTag === '腹泻'
-                    ? '/assets/extracted/health_medicine_bottle.png'
-                    : '/assets/extracted/health_firstaid_kit.png'
+                    ? './assets/extracted/health_medicine_bottle.png'
+                    : './assets/extracted/health_firstaid_kit.png'
                 }
                 alt=""
                 aria-hidden="true"
@@ -1475,7 +1475,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                 <div className="mb-1.5 flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-[13px] font-bold text-[#25324e]">
                     <img
-                      src="/assets/extracted/health_star_small.png"
+                      src="./assets/extracted/health_star_small.png"
                       alt=""
                       aria-hidden="true"
                       className="h-3.5 w-3.5 object-contain"
@@ -1544,7 +1544,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                 <div className="flex items-center justify-between gap-2.5">
                   <div className="flex shrink-0 items-center gap-1.5 text-[13px] font-bold text-[#25324e]">
                     <img
-                      src="/assets/extracted/health_thermometer.png"
+                      src="./assets/extracted/health_thermometer.png"
                       alt=""
                       aria-hidden="true"
                       className="h-5 w-4 object-contain"
@@ -1586,7 +1586,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               <div>
                 <div className="mb-1.5 flex items-center gap-1.5 text-[13px] font-bold text-[#25324e]">
                   <img
-                    src="/assets/extracted/health_star_small.png"
+                    src="./assets/extracted/health_star_small.png"
                     alt=""
                     aria-hidden="true"
                     className="h-3.5 w-3.5 object-contain"
@@ -1619,7 +1619,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                 <div className="mb-1.5 flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-[13px] font-bold text-[#25324e]">
                     <img
-                      src="/assets/extracted/health_icon_capsule.png"
+                      src="./assets/extracted/health_icon_capsule.png"
                       alt=""
                       aria-hidden="true"
                       className="h-4 w-4 object-contain"
@@ -1655,7 +1655,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 typo-body font-semibold text-[#1e3c72]">
                     <img
-                      src="/assets/extracted/health_firstaid_kit.png"
+                      src="./assets/extracted/health_firstaid_kit.png"
                       alt=""
                       aria-hidden="true"
                       className="h-5 w-5 object-contain"
@@ -1762,7 +1762,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                   className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-full border border-[#fff0a6] bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] typo-cta text-[#241b09] shadow-[0_6px_16px_rgba(244,179,30,0.42),inset_0_1.5px_1.5px_rgba(255,255,255,0.65)] transition-transform active:scale-95"
                 >
                   <img
-                    src="/assets/extracted/health_star_small.png"
+                    src="./assets/extracted/health_star_small.png"
                     alt=""
                     aria-hidden="true"
                     className="h-4 w-4 object-contain"

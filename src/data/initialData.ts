@@ -236,9 +236,9 @@ export function createInitialAppState(todayStr: string = getTodayDateStr()): Pla
         weather: 'sunny',
         recorder: '妈妈',
         photos: [
-          '/assets/extracted/diary_photo_cat.png',
-          '/assets/extracted/diary_photo_flower.png',
-          '/assets/extracted/diary_photo_grass.png',
+          './assets/extracted/diary_photo_cat.png',
+          './assets/extracted/diary_photo_flower.png',
+          './assets/extracted/diary_photo_grass.png',
         ],
       },
       {
@@ -250,9 +250,9 @@ export function createInitialAppState(todayStr: string = getTodayDateStr()): Pla
         weather: 'cloudy',
         recorder: '妈妈',
         photos: [
-          '/assets/extracted/diary_photo_stars.png',
-          '/assets/extracted/diary_photo_cat.png',
-          '/assets/extracted/diary_photo_boy.png',
+          './assets/extracted/diary_photo_stars.png',
+          './assets/extracted/diary_photo_cat.png',
+          './assets/extracted/diary_photo_boy.png',
         ],
       },
       {
@@ -264,8 +264,8 @@ export function createInitialAppState(todayStr: string = getTodayDateStr()): Pla
         weather: 'sunny',
         recorder: '妈妈',
         photos: [
-          '/assets/extracted/diary_photo_boy.png',
-          '/assets/extracted/pug.png',
+          './assets/extracted/diary_photo_boy.png',
+          './assets/extracted/pug.png',
         ],
       },
     ],

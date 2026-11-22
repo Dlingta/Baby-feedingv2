@@ -24,7 +24,7 @@ export const GrowthHeroScene: React.FC<GrowthHeroSceneProps> = ({
       {/* 原版手绘全景插画（紧靠依偎的主角 + 丰富花草草地 + 左侧土星环，自然羽化融入星空） */}
       <div className="relative w-full overflow-hidden">
         <img
-          src="/assets/extracted/growth_hero_scene.png"
+          src="./assets/extracted/growth_hero_scene.png"
           alt="黄色星星帽小漫游者与仰望的巴哥犬坐在开满小花的星球草地上"
           referrerPolicy="no-referrer"
           className="pointer-events-none block w-full h-auto select-none"
@@ -39,14 +39,14 @@ export const GrowthHeroScene: React.FC<GrowthHeroSceneProps> = ({
 
         {/* 副标与小蓝星、巴哥犬之间的星空留白点缀两颗暖金色手绘星星 */}
         <img
-          src="/assets/extracted/feed_glow_star.png"
+          src="./assets/extracted/feed_glow_star.png"
           alt=""
           aria-hidden="true"
           referrerPolicy="no-referrer"
           className="animate-float-slow pointer-events-none absolute left-[21%] top-[46%] z-10 h-7 w-7 -rotate-12 object-contain opacity-95 drop-shadow-[0_0_10px_rgba(253,224,71,0.88)]"
         />
         <img
-          src="/assets/extracted/health_star_small.png"
+          src="./assets/extracted/health_star_small.png"
           alt=""
           aria-hidden="true"
           referrerPolicy="no-referrer"

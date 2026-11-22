@@ -303,7 +303,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
     if (type === 'formula') {
       return (
         <img
-          src="/assets/extracted/feed_icon_bottle.png"
+          src="./assets/extracted/feed_icon_bottle.png"
           alt="配方奶"
           referrerPolicy="no-referrer"
           className="h-7 w-7 shrink-0 object-contain"
@@ -313,7 +313,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
     if (type === 'solids') {
       return (
         <img
-          src="/assets/extracted/feed_icon_solids.png"
+          src="./assets/extracted/feed_icon_solids.png"
           alt="辅食"
           referrerPolicy="no-referrer"
           className="h-6 w-7 shrink-0 object-contain"
@@ -323,7 +323,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
     if (type === 'breast') {
       return (
         <img
-          src="/assets/extracted/feed_icon_breast.png"
+          src="./assets/extracted/feed_icon_breast.png"
           alt="母乳"
           referrerPolicy="no-referrer"
           className="h-6.5 w-6.5 shrink-0 object-contain"
@@ -333,7 +333,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
     // 营养品 (维生素/益生菌等)
     return (
       <img
-        src="/assets/extracted/icon_sprout.png"
+        src="./assets/extracted/icon_sprout.png"
         alt="营养品"
         referrerPolicy="no-referrer"
         className="h-6.5 w-6.5 shrink-0 object-contain"
@@ -401,7 +401,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
       {/* 宇宙星空底层背景 */}
       <div
         className="pointer-events-none absolute inset-0 bg-cover bg-top opacity-80"
-        style={{ backgroundImage: "url('/assets/aistudio/____f8d9ecf9.png')" }}
+        style={{ backgroundImage: "url('./assets/aistudio/____f8d9ecf9.png')" }}
         aria-hidden="true"
       />
       <div
@@ -509,7 +509,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
             <div className="relative">
               {/* 左上角点缀发光小黄星 */}
               <img
-                src="/assets/extracted/feed_glow_star.png"
+                src="./assets/extracted/feed_glow_star.png"
                 alt=""
                 aria-hidden="true"
                 className="pointer-events-none absolute -top-3 left-5 z-20 h-7 w-7 object-contain drop-shadow-[0_0_8px_rgba(253,224,71,0.85)]"
@@ -522,7 +522,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                 <div className="flex min-w-0 items-center gap-3">
                   <AssetSlot slotName="feed_ocr_camera" showSlotTag={showSlotTag} className="shrink-0">
                     <img
-                      src="/assets/extracted/feed_icon_camera.png"
+                      src="./assets/extracted/feed_icon_camera.png"
                       alt="拍照识别"
                       referrerPolicy="no-referrer"
                       className="h-10 w-11 object-contain"
@@ -563,7 +563,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                 <ChevronRight className="h-4 w-4 shrink-0 text-[#49693d]" />
               </button>
               <img
-                src="/assets/extracted/feed_glow_star.png"
+                src="./assets/extracted/feed_glow_star.png"
                 alt=""
                 aria-hidden="true"
                 className="pointer-events-none absolute -bottom-2.5 -right-1 z-20 h-7 w-7 object-contain drop-shadow-[0_0_8px_rgba(253,224,71,0.85)]"
@@ -579,17 +579,17 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                 {
                   key: 'source' as FormTabKey,
                   label: '源泉',
-                  icon: '/assets/extracted/feed_icon_bottle.png',
+                  icon: './assets/extracted/feed_icon_bottle.png',
                 },
                 {
                   key: 'energy' as FormTabKey,
                   label: '能量瓶',
-                  icon: '/assets/extracted/feed_tab_energy.png',
+                  icon: './assets/extracted/feed_tab_energy.png',
                 },
                 {
                   key: 'dew' as FormTabKey,
                   label: '晨露',
-                  icon: '/assets/extracted/feed_tab_dew.png',
+                  icon: './assets/extracted/feed_tab_dew.png',
                 },
               ].map((tab) => {
                 const active = activeFormTab === tab.key;
@@ -895,7 +895,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
 
               <div className="mt-5 flex flex-col items-center text-center">
                 <img
-                  src="/assets/extracted/feed_ringed_planet.png"
+                  src="./assets/extracted/feed_ringed_planet.png"
                   alt="休眠中的小星球"
                   referrerPolicy="no-referrer"
                   className="h-14 w-auto animate-float-slow object-contain opacity-90"
@@ -908,7 +908,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
               </div>
 
               <img
-                src="/assets/extracted/feed_glow_star.png"
+                src="./assets/extracted/feed_glow_star.png"
                 alt=""
                 aria-hidden="true"
                 className="pointer-events-none absolute bottom-5 right-4 h-6 w-6 object-contain drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"
@@ -920,7 +920,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
           <div className="relative -mx-4 mt-3 flex flex-col items-center">
             <AssetSlot slotName="empty_feeding_bottle" showSlotTag={showSlotTag} className="w-full">
               <img
-                src="/assets/extracted/feed_empty_bottle.png"
+                src="./assets/extracted/feed_empty_bottle.png"
                 alt="巨大空玻璃奶瓶与小男孩和巴哥犬"
                 referrerPolicy="no-referrer"
                 className="mx-auto w-[96%] max-w-[376px] object-contain"
@@ -954,7 +954,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
             <div className="relative rounded-[22px] border border-white/12 bg-[#122452]/65 px-3.5 pb-2.5 pt-3 shadow-[0_12px_28px_rgba(3,9,28,0.46)] backdrop-blur-md">
               {/* 右上角点缀发光大星星 */}
               <img
-                src="/assets/extracted/feed_glow_star.png"
+                src="./assets/extracted/feed_glow_star.png"
                 alt=""
                 aria-hidden="true"
                 className="pointer-events-none absolute -right-1.5 -top-3.5 h-9 w-9 object-contain drop-shadow-[0_0_10px_rgba(253,224,71,0.9)]"
@@ -1272,7 +1272,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <img
-                    src="/assets/extracted/feed_glow_star.png"
+                    src="./assets/extracted/feed_glow_star.png"
                     alt=""
                     aria-hidden="true"
                     className="h-6 w-6 object-contain"
@@ -1364,7 +1364,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
           {/* 底部趴星球托腮小男孩与巴哥犬插画 (自然融入星空底色) */}
           <div className="pointer-events-none relative -mx-4 mt-3 overflow-hidden">
             <img
-              src="/assets/extracted/feed_boy_pug_planet.png"
+              src="./assets/extracted/feed_boy_pug_planet.png"
               alt="趴在星球上的小男孩与巴哥犬"
               referrerPolicy="no-referrer"
               style={{
