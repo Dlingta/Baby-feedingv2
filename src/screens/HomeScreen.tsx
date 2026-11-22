@@ -135,7 +135,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <button
             type="button"
             onClick={() => onNavigate('settings')}
-            className="mt-7 flex min-h-[48px] items-center justify-center gap-2 rounded-[22px] bg-amber-300 px-8 py-3 text-base font-bold text-slate-900 shadow-[0_10px_26px_rgba(252,211,77,0.42)] transition-transform hover:bg-amber-200 active:scale-[0.97]"
+            className="mt-7 flex min-h-[48px] items-center justify-center gap-2 rounded-[22px] bg-amber-300 px-8 py-3 typo-cta text-slate-900 shadow-[0_10px_26px_rgba(252,211,77,0.42)] transition-transform hover:bg-amber-200 active:scale-[0.97]"
           >
             <Sparkles className="h-5 w-5" />
             <span>初始化档案</span>
@@ -457,11 +457,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   className="flex h-full flex-col justify-end pb-[14%] pl-[22%] pr-[8%] transition-transform active:scale-95"
                 >
                   <div className="flex items-baseline justify-center gap-0.5 tabular-nums text-[#0b1f4d]">
-                    <span className="text-[22px] font-extrabold leading-none tracking-tight">
+                    <span className="text-[22px] typo-num leading-none tracking-tight">
                       {todayDiariesCount}
                     </span>
-                    <span className="text-[12.5px] font-bold">篇</span>
-                    <ChevronRight className="ml-0.5 h-3.5 w-3.5 self-center stroke-[2.6] text-[#9b8265]" />
+                    <span className="typo-meta font-semibold">篇</span>
+                    <ChevronRight className="ml-0.5 h-3.5 w-3.5 self-center stroke-[2.4] text-[#9b8265]" />
                   </div>
                 </button>
 
@@ -473,11 +473,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   className="flex h-full flex-col justify-end pb-[14%] pl-[16%] pr-[6%] transition-transform active:scale-95"
                 >
                   <div className="flex items-baseline justify-center gap-0.5 tabular-nums text-[#0b1f4d]">
-                    <span className="text-[22px] font-extrabold leading-none tracking-tight">
+                    <span className="text-[22px] typo-num leading-none tracking-tight">
                       {todayFeedingsCount}
                     </span>
-                    <span className="text-[12.5px] font-bold">次</span>
-                    <ChevronRight className="ml-0.5 h-3.5 w-3.5 self-center stroke-[2.6] text-[#9b8265]" />
+                    <span className="typo-meta font-semibold">次</span>
+                    <ChevronRight className="ml-0.5 h-3.5 w-3.5 self-center stroke-[2.4] text-[#9b8265]" />
                   </div>
                 </button>
 
@@ -508,14 +508,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       </section>
 
       {/* =================================================================
-          第二屏下方扩展区：早教清单 + 贴纸风格疫苗提醒卡（向下滑动后才完整显现）
+          第二屏下方扩展区：早教清单 + 疫苗提醒卡（统一使用全站不规则手绘撕纸底框 .diary-paper-card）
          ================================================================= */}
       <div className="mt-4 flex flex-col gap-4 px-4">
         <section aria-label="每日早教探索清单">
-          <div className="paper-card-soft px-4 py-4">
-            <div className="mb-2.5 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-[#2d251e]">今日星球早教清单</h2>
-              <span className="text-xs font-medium text-[#756657] tabular-nums">
+          <div className="diary-paper-card px-2 py-2">
+            <div className="mb-2 flex items-center justify-between px-0.5">
+              <h2 className="typo-section-title text-[#1e2c4a]">今日星球早教清单</h2>
+              <span className="typo-meta text-[#756657] tabular-nums">
                 已完成 {state.checklist.filter((c) => c.completed).length}/{state.checklist.length}
               </span>
             </div>
@@ -528,7 +528,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     key={item.id}
                     type="button"
                     onClick={() => handleCheck(item)}
-                    className="relative flex w-full min-h-[48px] items-center justify-between gap-3 py-2.5 text-left transition-colors hover:bg-[#f3e6cc]/50 active:scale-[0.99]"
+                    className="relative flex w-full min-h-[48px] items-center justify-between gap-3 rounded-xl px-1 py-2.5 text-left transition-colors hover:bg-[#f3e6cc]/50 active:scale-[0.99]"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <span
@@ -547,17 +547,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       </span>
                       <div className="min-w-0">
                         <div
-                          className={`text-sm font-semibold truncate transition-colors ${
+                          className={`typo-item-title truncate transition-colors ${
                             item.completed ? 'text-[#87796b] line-through' : 'text-[#2d251e]'
                           }`}
                         >
                           {item.title}
                         </div>
-                        <div className="text-xs text-[#7c6e5f] truncate">{item.subtitle}</div>
+                        <div className="typo-meta text-[#7c6e5f] truncate">{item.subtitle}</div>
                       </div>
                     </div>
                     {item.completed && (
-                      <span className="shrink-0 text-xs font-semibold text-[#55843d]">★ 已点亮</span>
+                      <span className="shrink-0 typo-badge text-[#55843d]">★ 已点亮</span>
                     )}
                   </button>
                 );
@@ -568,20 +568,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {nextVaccine && (
           <section aria-label="下一针疫苗提醒">
-            <div className="sticker-card relative overflow-hidden rounded-[22px] p-4 transform -rotate-[0.4deg]">
-              <div className="pointer-events-none absolute -top-1 left-1/2 h-3.5 w-16 -translate-x-1/2 rounded-sm bg-amber-200/80 shadow-xs" />
-
+            <div className="diary-paper-card relative px-2 py-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-100 border border-sky-200">
                     <IconShield className="h-8 w-8" />
                   </div>
                   <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
+                    <div className="flex items-center gap-1.5 typo-meta font-medium text-amber-700">
                       <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">下一针防御护盾提醒 · {nextVaccine.recommendedMonth}</span>
                     </div>
-                    <div className="mt-0.5 text-sm font-bold text-[#2d251e] truncate">
+                    <div className="mt-0.5 typo-item-title text-[#1e2c4a] truncate">
                       {nextVaccine.name}（{nextVaccine.doseLabel}）
                     </div>
                   </div>
@@ -590,7 +588,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <button
                   type="button"
                   onClick={() => onQuickOpenVaccine(nextVaccine)}
-                  className="shrink-0 min-h-[40px] rounded-2xl bg-[#1b336b] px-3.5 py-2 text-xs font-semibold text-amber-100 shadow-sm transition-transform hover:bg-[#234185] active:scale-95 whitespace-nowrap"
+                  className="shrink-0 min-h-[40px] rounded-2xl bg-[#1b336b] px-3.5 py-2 typo-tab-active text-amber-100 shadow-sm transition-transform hover:bg-[#234185] active:scale-95 whitespace-nowrap"
                 >
                   去打卡
                 </button>

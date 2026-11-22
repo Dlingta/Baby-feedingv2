@@ -3,8 +3,6 @@ import {
   AlertTriangle,
   BookOpen,
   ChevronDown,
-  ChevronLeft,
-  Info,
   RefreshCw,
   Settings,
   ShieldAlert,
@@ -23,6 +21,11 @@ import {
   ReferenceLoadMode,
 } from '../data/whoGrowthStandards';
 import { AssessmentCard, getSeverityBadgeClass } from '../components/AssessmentCard';
+import { GrowthHeroScene } from '../components/GrowthHeroScene';
+import {
+  CosmicModuleHeader,
+  HandDrawnInfoIcon,
+} from '../../../components/CosmicModuleHeader';
 
 interface GrowthAssessmentProps {
   profile: GrowthBabyProfile;
@@ -91,76 +94,43 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
         }}
       />
 
-      {/* 5.1 页面顶部 */}
-      <header className="relative z-20 flex min-h-[54px] items-center justify-between px-4 pt-safe pb-1">
-        <button
-          type="button"
-          onClick={onBackOverview}
-          aria-label="返回观测坐标"
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-[#132550]/65 text-indigo-100 backdrop-blur-sm transition-transform hover:bg-white/15 active:scale-90"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-
-        <div className="flex items-center gap-1.5">
-          <h1 className="text-[18px] font-bold tracking-[0.08em] text-[#fffaf0] drop-shadow-[0_2px_8px_rgba(4,10,30,0.85)]">
-            成长营养评价
-          </h1>
-          <span
-            className="text-[12px] text-[#fde047] drop-shadow-[0_0_6px_rgba(253,224,71,0.9)]"
-            aria-hidden="true"
+      {/* 5.1 统一手绘星空顶栏 */}
+      <CosmicModuleHeader
+        title="观测坐标"
+        subtitle="营养评价"
+        onBack={onBackOverview}
+        backLabel="返回观测坐标"
+        rightAction={
+          <button
+            type="button"
+            onClick={() => setShowSourcesDetail((v) => !v)}
+            aria-label="查看参考标准说明"
+            className={`flex h-11 w-11 items-center justify-center rounded-xl transition-transform active:scale-90 ${
+              showSourcesDetail
+                ? 'bg-amber-300/20 text-amber-200'
+                : 'text-[#c5cdfa] hover:bg-white/10'
+            }`}
           >
-            ✦
-          </span>
-        </div>
+            <HandDrawnInfoIcon />
+          </button>
+        }
+      />
 
-        <button
-          type="button"
-          onClick={() => setShowSourcesDetail((v) => !v)}
-          aria-label="查看参考标准说明"
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-[#132550]/65 text-amber-200 hover:bg-white/15 active:scale-90"
-        >
-          <Info className="h-4.5 w-4.5" />
-        </button>
-      </header>
+      {/* 全景融合插画区：星星帽宝宝 + 巴哥犬 + 蓝色土星 + 弧形草地山丘 */}
+      <GrowthHeroScene
+        activeTab="assessment"
+        subtitle="从每一次测量，读懂宝宝的成长。"
+        onSelectOverview={onBackOverview}
+        onSelectAssessment={() => {}}
+      />
 
-      <div className="relative z-10 flex w-full min-w-0 max-w-full flex-1 flex-col gap-4 px-4">
-        {/* 顶部副标题 + 视图切换 + 插画 */}
-        <div className="flex items-end justify-between gap-2 px-0.5">
-          <div className="min-w-0 flex-1 pb-1">
-            <p className="text-[12px] font-medium text-amber-100/90">
-              从每一次测量，读懂宝宝的成长。
-            </p>
-            <div className="mt-2 inline-flex items-center rounded-full border border-white/15 bg-[#152550]/80 p-0.5 backdrop-blur-md">
-              <button
-                type="button"
-                onClick={onBackOverview}
-                className="rounded-full px-3 py-1 text-[11.5px] font-medium text-indigo-100/85 transition-colors hover:text-white"
-              >
-                走势与历史
-              </button>
-              <button
-                type="button"
-                className="rounded-full bg-gradient-to-b from-[#ffe25f] via-[#facc34] to-[#f2ab1a] px-3 py-1 text-[11.5px] font-bold text-[#1f190d] shadow-xs"
-              >
-                专业营养评价
-              </button>
-            </div>
-          </div>
-
-          <img
-            src="/assets/extracted/feed_boy_pug_planet.png"
-            alt="小漫游者与巴哥犬"
-            referrerPolicy="no-referrer"
-            className="h-[80px] w-auto shrink-0 object-contain drop-shadow-[0_6px_14px_rgba(3,8,24,0.45)]"
-          />
-        </div>
+      <div className="relative z-20 -mt-1 flex w-full min-w-0 max-w-full flex-1 flex-col gap-4 px-4">
 
         {/* 宝宝姓名、月龄与被评估测量记录切换器 */}
         <div className="rounded-[22px] border border-white/15 bg-[#122452]/78 px-3.5 py-2.5 text-[12px] text-indigo-100 shadow-[0_10px_24px_rgba(3,8,24,0.38)] backdrop-blur-md">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
-              <span className="font-extrabold text-amber-100">
+              <span className="font-semibold text-amber-100">
                 {profile.name || '未知漫游者'}
               </span>
               <span className="mx-1.5 text-indigo-300/70">·</span>
@@ -200,17 +170,17 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
                 aria-hidden="true"
                 className="h-5 w-5 object-contain"
               />
-              <h2 className="text-[15.5px] font-extrabold text-[#1c2a48]">本次营养状况评价</h2>
+              <h2 className="typo-section-title text-[#1c2a48]">本次营养状况评价</h2>
             </div>
             {activeMeasurement?.isDemo && (
-              <span className="text-[10.5px] font-bold text-[#9a6a15]">演示数据</span>
+              <span className="typo-badge text-[#9a6a15]">演示数据</span>
             )}
           </div>
 
           {/* 综合状态主标牌 */}
           <div className="mt-3 flex flex-col items-center text-center">
             <div
-              className={`inline-flex items-center justify-center rounded-full border-2 px-5 py-2 text-[17px] font-extrabold tracking-wide shadow-xs ${overallBannerStyle}`}
+              className={`inline-flex items-center justify-center rounded-full border-2 px-5 py-2 typo-nav-title shadow-xs ${overallBannerStyle}`}
             >
               {assessment ? assessment.overallLabel : '数据不足，暂无法评价'}
             </div>
@@ -225,7 +195,7 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
           {/* 缺失条件与快捷引导 */}
           {assessment && assessment.blockingReasons.length > 0 && (
             <div className="mt-3 rounded-2xl border border-[#e6d3b3] bg-[#f6ecd7] p-2.5 text-[11.5px] text-[#6d5428] space-y-1.5">
-              <div className="flex items-center gap-1.5 font-extrabold">
+              <div className="flex items-center gap-1.5 font-semibold">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[#b45309]" />
                 <span>当前暂无法生成完整评价的原因：</span>
               </div>
@@ -271,7 +241,7 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
           {/* 早产儿专项提醒 */}
           {assessment?.pretermNotice && (
             <div className="mt-2.5 rounded-2xl border border-[#d6e0f2] bg-[#f1f6ff] p-2.5 text-[11px] leading-relaxed text-[#24437a]">
-              <div className="font-extrabold">早产儿评估规则提示：</div>
+              <div className="font-semibold">早产儿评估规则提示：</div>
               <p className="mt-0.5">{assessment.pretermNotice}</p>
             </div>
           )}
@@ -323,10 +293,10 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
                 className="h-6 w-6 object-contain"
               />
               <div>
-                <h3 className="text-[14.5px] font-extrabold text-[#1e2c4a]">
+                <h3 className="typo-section-title text-[#1e2c4a]">
                   头围单独评价（发育监测）
                 </h3>
-                <p className="text-[10.5px] text-[#7c6f60]">
+                <p className="typo-meta text-[#7c6f60]">
                   独立监测颅脑与生长发育，不归入体重营养状态分级
                 </p>
               </div>
@@ -334,7 +304,7 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
 
             {headEval && (
               <span
-                className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-extrabold ${getSeverityBadgeClass(
+                className={`shrink-0 rounded-full border px-2.5 py-0.5 typo-badge font-semibold ${getSeverityBadgeClass(
                   headEval.severity
                 )}`}
               >
@@ -345,24 +315,24 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
 
           <div className="mt-2.5 grid grid-cols-3 gap-2 text-center">
             <div className="rounded-xl bg-[#f5ecda] px-2 py-2">
-              <div className="text-[10px] text-[#7a6d5e]">当前头围</div>
-              <div className="mt-0.5 font-typewriter text-[13.5px] font-extrabold text-[#1e2c4a] tabular-nums">
+              <div className="typo-badge text-[#7a6d5e]">当前头围</div>
+              <div className="mt-0.5 font-typewriter text-[14px] typo-num text-[#1e2c4a]">
                 {headEval?.rawValue !== null && headEval?.rawValue !== undefined
                   ? `${headEval.rawValue.toFixed(1)} cm`
                   : '未录入'}
               </div>
             </div>
             <div className="rounded-xl bg-[#f5ecda] px-2 py-2">
-              <div className="text-[10px] text-[#7a6d5e]">HCZ Z-score</div>
-              <div className="mt-0.5 font-typewriter text-[13.5px] font-extrabold text-[#1e2c4a] tabular-nums">
+              <div className="typo-badge text-[#7a6d5e]">HCZ Z-score</div>
+              <div className="mt-0.5 font-typewriter text-[14px] typo-num text-[#1e2c4a]">
                 {headEval && headEval.zScore !== null
                   ? `${headEval.zScore >= 0 ? '+' : ''}${headEval.zScore.toFixed(2)}`
                   : '待计算'}
               </div>
             </div>
             <div className="rounded-xl bg-[#f5ecda] px-2 py-2">
-              <div className="text-[10px] text-[#7a6d5e]">百分位数</div>
-              <div className="mt-0.5 font-typewriter text-[13.5px] font-extrabold text-[#1e2c4a] tabular-nums">
+              <div className="typo-badge text-[#7a6d5e]">百分位数</div>
+              <div className="mt-0.5 font-typewriter text-[14px] typo-num text-[#1e2c4a]">
                 {headEval ? headEval.percentileLabel : '待计算'}
               </div>
             </div>
@@ -383,7 +353,7 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
                 aria-hidden="true"
                 className="h-4.5 w-4.5 object-contain"
               />
-              <h3 className="text-[14px] font-extrabold text-[#1e2c4a]">
+              <h3 className="typo-section-title text-[#1e2c4a]">
                 0～3 岁成长评估日历（9 次随访节点）
               </h3>
             </div>
@@ -400,7 +370,7 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
                     : 'border-[#e5d9c3] bg-[#f8f2e6] text-[#6d6052]'
                 }`}
               >
-                <div className="flex items-center justify-center gap-1 text-[12px] font-extrabold">
+                <div className="flex items-center justify-center gap-1 typo-meta font-semibold">
                   <img
                     src="/assets/extracted/health_star_small.png"
                     alt=""
@@ -436,7 +406,7 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
           >
             <div className="flex items-center gap-1.5">
               <BookOpen className="h-4 w-4 text-[#2b5298]" />
-              <h3 className="text-[14px] font-extrabold text-[#1e2c4a]">
+              <h3 className="typo-section-title text-[#1e2c4a]">
                 这些参考曲线从哪里来？
               </h3>
             </div>
@@ -526,7 +496,7 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
           >
             <div className="flex items-center justify-between border-b border-[#e6d7bc] pb-2.5">
               <div>
-                <h4 className="text-[15.5px] font-extrabold">
+                <h4 className="typo-section-title">
                   {explainingIndicator.title}（{explainingIndicator.shortLabel}）
                 </h4>
                 <p className="text-[11px] text-[#7a6d5e]">{explainingIndicator.referenceStandard}</p>
@@ -560,7 +530,7 @@ export const GrowthAssessment: React.FC<GrowthAssessmentProps> = ({
             <button
               type="button"
               onClick={() => setExplainingIndicator(null)}
-              className="mt-4 min-h-[42px] w-full rounded-full bg-gradient-to-b from-[#ffe25e] to-[#f4b21d] text-[13.5px] font-extrabold text-[#241b09]"
+              className="mt-4 min-h-[42px] w-full rounded-full bg-gradient-to-b from-[#ffe25e] to-[#f4b21d] typo-item-title text-[#241b09]"
             >
               我知道了
             </button>

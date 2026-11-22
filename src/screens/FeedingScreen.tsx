@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Clock,
   Delete,
-  HelpCircle,
   Pencil,
   Plus,
   Trash2,
@@ -14,6 +13,11 @@ import {
 import { FeedingRecord, FeedingType, PlanetAppState } from '../types/planet';
 import { getCurrentTimeStr, getTodayDateStr } from '../data/initialData';
 import { AssetSlot } from '../components/Illustrations';
+import {
+  CosmicModuleHeader,
+  CosmicSubHeader,
+  HandDrawnInfoIcon,
+} from '../components/CosmicModuleHeader';
 
 export type FeedingViewMode = 'timeline' | 'empty' | 'form';
 type RangeOption = 7 | 30 | 90;
@@ -311,10 +315,10 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
             <button
               type="button"
               onClick={() => setRangeDays(r)}
-              className={`relative flex-1 rounded-full py-1.5 text-[13px] transition-all ${
+              className={`relative flex-1 rounded-full py-1.5 transition-all ${
                 active
-                  ? 'bg-gradient-to-b from-[#fde074] to-[#f2b932] font-bold text-[#182848] shadow-[0_2px_12px_rgba(249,207,76,0.55)]'
-                  : 'font-medium text-indigo-100/85 hover:text-white'
+                  ? 'bg-gradient-to-b from-[#fde074] to-[#f2b932] typo-tab-active text-[#182848] shadow-[0_2px_12px_rgba(249,207,76,0.55)]'
+                  : 'typo-tab text-indigo-100/85 hover:text-white'
               }`}
             >
               {r}天
@@ -342,62 +346,38 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
       />
 
       {/* =================================================================
-          顶部手绘星空导航栏
+          顶部统一手绘星空导航栏（与「星光碎片」完全一致的视觉风格）
          ================================================================= */}
-      <header className="relative z-20 flex min-h-[54px] items-center justify-between px-4 pt-safe pb-1">
-        <button
-          type="button"
-          onClick={mode === 'form' ? () => onChangeMode('timeline') : onBackHome}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/8 text-indigo-100 backdrop-blur-sm transition-transform hover:bg-white/15 active:scale-90"
-          aria-label="返回"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-
-        <div className="flex items-center gap-1.5">
-          {mode !== 'form' && (
-            <span className="text-[12px] text-[#fde047] drop-shadow-[0_0_6px_rgba(253,224,71,0.9)]" aria-hidden="true">
-              ✦
-            </span>
-          )}
-          <h1 className="text-[18px] font-semibold tracking-[0.12em] text-[#fffaf0] drop-shadow-[0_2px_8px_rgba(4,10,30,0.8)]">
-            {mode === 'form' ? '记录喂养' : '喂养'}
-          </h1>
-          <span className="text-[12px] text-[#fde047] drop-shadow-[0_0_6px_rgba(253,224,71,0.9)]" aria-hidden="true">
-            ✦
-          </span>
-        </div>
-
-        {mode === 'form' ? (
-          <button
-            type="button"
-            onClick={() => setShowFormHelp((v) => !v)}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/8 text-indigo-100 backdrop-blur-sm transition-transform hover:bg-white/15 active:scale-90"
-            aria-label="录入说明"
-          >
-            <HelpCircle className="h-4.5 w-4.5" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowDateBar((v) => !v)}
-            className={`flex h-9 w-9 items-center justify-center rounded-xl transition-transform active:scale-90 ${
-              showDateBar ? 'bg-amber-300/20 text-amber-200' : 'text-indigo-100 hover:bg-white/10'
-            }`}
-            aria-label="切换日期"
-          >
-            <svg viewBox="0 0 28 28" className="h-6 w-6" fill="none" aria-hidden="true">
-              <rect x="4" y="6.5" width="20" height="17" rx="4" stroke="currentColor" strokeWidth="1.9" />
-              <path d="M9 4V8.5M19 4V8.5M4.5 11.5H23.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-              <circle cx="10" cy="16" r="1.2" fill="currentColor" />
-              <circle cx="14" cy="16" r="1.2" fill="currentColor" />
-              <circle cx="18" cy="16" r="1.2" fill="currentColor" />
-              <circle cx="10" cy="20" r="1.2" fill="currentColor" />
-              <circle cx="14" cy="20" r="1.2" fill="currentColor" />
-            </svg>
-          </button>
-        )}
-      </header>
+      {mode === 'form' ? (
+        <CosmicSubHeader
+          title="记录喂养"
+          onBack={() => onChangeMode('timeline')}
+          backLabel="返回喂养"
+          rightSlot={
+            <button
+              type="button"
+              onClick={() => setShowFormHelp((v) => !v)}
+              className={`flex h-11 w-11 items-center justify-center rounded-xl transition-transform active:scale-90 ${
+                showFormHelp
+                  ? 'bg-amber-300/20 text-amber-200'
+                  : 'text-[#c5cdfa] hover:bg-white/10'
+              }`}
+              aria-label="录入说明"
+            >
+              <HandDrawnInfoIcon />
+            </button>
+          }
+        />
+      ) : (
+        <CosmicModuleHeader
+          title="能量喂养"
+          subtitle="奶量与辅食"
+          onBack={onBackHome}
+          onCalendarClick={() => setShowDateBar((v) => !v)}
+          calendarActive={showDateBar}
+          calendarLabel="切换日期"
+        />
+      )}
 
       {/* 3.3 帮助提示气泡 */}
       {mode === 'form' && showFormHelp && (
@@ -793,7 +773,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                 />
                 <path d="M18 11V21M14 16H22" stroke="#fffef5" strokeWidth="1.3" strokeLinecap="round" opacity="0.7" />
               </svg>
-              <span className="text-[16px] font-extrabold tracking-widest">保存</span>
+              <span className="typo-cta tracking-widest">保存</span>
             </button>
 
             {['4', '5', '6', '7', '8', '9', '.', '0', 'back'].map((k) => (
@@ -801,7 +781,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                 key={k}
                 type="button"
                 onClick={() => handleKeypadPress(k)}
-                className="flex h-[46px] items-center justify-center rounded-[14px] border border-[#e8d9bc] bg-[#fbf3e2] font-typewriter text-[19px] font-bold text-[#182848] shadow-[0_3px_8px_rgba(3,9,26,0.35),inset_0_1px_0_rgba(255,255,255,0.8)] transition-transform active:scale-95"
+                className="flex h-[46px] items-center justify-center rounded-[14px] border border-[#e8d9bc] bg-[#fbf3e2] font-typewriter text-[19px] font-semibold text-[#182848] shadow-[0_3px_8px_rgba(3,9,26,0.35),inset_0_1px_0_rgba(255,255,255,0.8)] transition-transform active:scale-95"
               >
                 {k === 'back' ? (
                   <Delete className="h-5 w-5 text-[#5a5046]" />
@@ -821,7 +801,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
          ================================================================= */}
       {mode !== 'form' && (isEmptyView || (!showAllRecords && dayFeedings.length === 0)) && (
         <div
-          style={{ minHeight: 'calc(var(--app-viewport-h) - 54px - var(--safe-top))' }}
+          style={{ minHeight: 'calc(var(--app-viewport-h) - 68px - var(--safe-top))' }}
           className="relative z-10 flex flex-1 flex-col justify-between px-4 pb-3 pt-1"
         >
           <div>
@@ -877,9 +857,9 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
             <button
               type="button"
               onClick={() => onChangeMode('form')}
-              className="absolute bottom-4 flex min-h-[46px] items-center justify-center gap-2 rounded-full border-2 border-[#fff3bd]/80 bg-gradient-to-b from-[#fde074] to-[#f2b830] px-7 py-2.5 text-[14.5px] font-extrabold text-[#182848] shadow-[0_8px_22px_rgba(249,207,76,0.5)] transition-transform hover:brightness-105 active:scale-95"
+              className="absolute bottom-4 flex min-h-[46px] items-center justify-center gap-2 rounded-full border-2 border-[#fff3bd]/80 bg-gradient-to-b from-[#fde074] to-[#f2b830] px-7 py-2.5 typo-cta text-[#182848] shadow-[0_8px_22px_rgba(249,207,76,0.5)] transition-transform hover:brightness-105 active:scale-95"
             >
-              <Camera className="h-4.5 w-4.5 stroke-[2.4]" />
+              <Camera className="h-4.5 w-4.5 stroke-[2.2]" />
               <span>去记录第一条喂养</span>
             </button>
           </div>
@@ -891,7 +871,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
          ================================================================= */}
       {mode === 'timeline' && !isEmptyView && (showAllRecords || dayFeedings.length > 0) && (
         <div
-          style={{ minHeight: 'calc(var(--app-viewport-h) - 54px - var(--safe-top))' }}
+          style={{ minHeight: 'calc(var(--app-viewport-h) - 68px - var(--safe-top))' }}
           className="relative z-10 flex flex-1 flex-col justify-between px-4 pt-1"
         >
           <div className="space-y-4">
@@ -1044,7 +1024,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                     aria-hidden="true"
                     className="h-6 w-6 object-contain"
                   />
-                  <h2 className="text-[15px] font-bold tracking-wide text-[#182848]">
+                  <h2 className="typo-section-title text-[#182848]">
                     喂养记录
                   </h2>
                 </div>
@@ -1053,15 +1033,15 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                   <button
                     type="button"
                     onClick={() => onChangeMode('form')}
-                    className="inline-flex items-center gap-0.5 rounded-full bg-[#f9cf4c] px-2.5 py-1 text-[11.5px] font-bold text-[#182848] shadow-2xs transition-transform active:scale-95"
+                    className="inline-flex items-center gap-0.5 rounded-full bg-[#f9cf4c] px-2.5 py-1 typo-badge font-semibold text-[#182848] shadow-2xs transition-transform active:scale-95"
                   >
-                    <Plus className="h-3.5 w-3.5 stroke-[2.8]" />
+                    <Plus className="h-3.5 w-3.5 stroke-[2.4]" />
                     <span>记一顿</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowAllRecords((v) => !v)}
-                    className="inline-flex items-center gap-0.5 text-[12px] font-semibold text-[#6a5d4f] hover:text-[#182848]"
+                    className="inline-flex items-center gap-0.5 typo-meta font-medium text-[#6a5d4f] hover:text-[#182848]"
                   >
                     <span>{showAllRecords ? '仅当日' : '全部'}</span>
                     <ChevronRight className="h-3.5 w-3.5" />
@@ -1092,24 +1072,24 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                       />
 
                       <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                        <span className="w-[42px] shrink-0 font-typewriter text-[13.5px] font-semibold text-[#1c2d50] tabular-nums">
+                        <span className="w-[42px] shrink-0 font-typewriter typo-item-title text-[#1c2d50] tabular-nums">
                           {item.time}
                         </span>
 
                         {renderFeedingIcon(item.type)}
 
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[13.5px] font-semibold text-[#182848]">
+                          <div className="truncate typo-item-title text-[#182848]">
                             {formatRecordSummary(item)}
                           </div>
                           {item.note && (
-                            <div className="truncate text-[11px] text-[#7a6f62]">{item.note}</div>
+                            <div className="truncate typo-meta text-[#7a6f62]">{item.note}</div>
                           )}
                         </div>
                       </div>
 
                       <div className="flex shrink-0 items-center gap-1">
-                        <span className="rounded-full bg-[#efe4ce] px-2.5 py-0.5 text-[11px] font-semibold text-[#6d5f4e] tabular-nums">
+                        <span className="rounded-full bg-[#efe4ce] px-2.5 py-0.5 typo-badge text-[#6d5f4e] tabular-nums">
                           1次
                         </span>
                         <button

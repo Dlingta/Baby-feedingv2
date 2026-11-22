@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ArrowLeft,
   CheckCircle2,
   Download,
   Sparkles,
@@ -10,6 +9,7 @@ import {
 } from 'lucide-react';
 import { BabyProfile, PlanetAppState } from '../types/planet';
 import { calculatePlanetAge, getTodayDateStr } from '../data/initialData';
+import { CosmicModuleHeader } from '../components/CosmicModuleHeader';
 
 interface SettingsScreenProps {
   state: PlanetAppState;
@@ -161,28 +161,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   return (
     <div className="flex min-h-full w-full min-w-0 max-w-full flex-col overflow-x-clip pb-6">
-      {/* 顶部栏 */}
-      <header className="sticky top-0 z-20 flex min-h-[56px] items-center justify-between bg-[#09132e]/88 px-4 pt-safe pb-2 backdrop-blur-md">
-        <button
-          type="button"
-          onClick={onBackHome}
-          className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-indigo-100 hover:bg-white/10 active:scale-95"
-          aria-label="返回星球首页"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-
-        <div className="text-center">
-          <div className="font-display text-xl tracking-wide text-amber-100">星球档案与数据舱</div>
-          <div className="text-[11px] text-indigo-200/75">档案设置 · 记录人 · 记忆备份</div>
-        </div>
-
-        <div className="w-[44px]" />
-      </header>
+      {/* 统一手绘星空顶栏 */}
+      <CosmicModuleHeader
+        title="星际档案"
+        subtitle="设置与备份"
+        onBack={onBackHome}
+        backLabel="返回星球首页"
+        sticky
+      />
 
       <div className="flex flex-col gap-4 px-4 pt-3">
         {feedback && (
-          <div className="flex items-center gap-2 rounded-[20px] bg-emerald-500/20 border border-emerald-300/40 px-4 py-3 text-xs font-semibold text-emerald-100 shadow-[0_8px_20px_rgba(3,8,24,0.3)]">
+          <div className="flex items-center gap-2 rounded-[20px] bg-emerald-500/20 border border-emerald-300/40 px-4 py-3 typo-meta font-medium text-emerald-100 shadow-[0_8px_20px_rgba(3,8,24,0.3)]">
             <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-300" />
             <span>{feedback}</span>
           </div>
@@ -191,7 +181,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         {/* 1. 宝宝基本信息与实时年龄计算预览 */}
         <form onSubmit={handleSaveBasic} className="paper-card p-4 space-y-3.5">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-[#2d251e]">小漫游者基本档案</h2>
+            <h2 className="typo-section-title text-[#1e2c4a]">小漫游者基本档案</h2>
             {birthDate && (
               <button
                 type="button"
@@ -200,7 +190,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   onUpdateProfile({ ...state.profile, birthDate: '' });
                   showToast('已重置出生日期（可回首页查看未初始化状态）');
                 }}
-                className="text-[11px] font-medium text-[#7c6e5f] underline underline-offset-2"
+                className="typo-badge text-[#7c6e5f] underline underline-offset-2"
               >
                 清空生日预览引导页
               </button>
@@ -208,7 +198,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
 
           <label className="block">
-            <span className="text-xs font-semibold text-[#6e6052]">宝宝昵称</span>
+            <span className="typo-meta font-medium text-[#6e6052]">宝宝昵称</span>
             <input
               type="text"
               value={name}
@@ -332,7 +322,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
           <button
             type="submit"
-            className="flex min-h-[46px] w-full items-center justify-center rounded-[20px] bg-[#1b336b] text-sm font-bold text-amber-100 shadow-[0_6px_16px_rgba(27,51,107,0.28)] active:scale-95"
+            className="flex min-h-[46px] w-full items-center justify-center rounded-[20px] bg-[#1b336b] typo-cta text-amber-100 shadow-[0_6px_16px_rgba(27,51,107,0.28)] active:scale-95"
           >
             保存星球档案
           </button>
@@ -341,8 +331,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         {/* 2. 常用记录人管理列表 */}
         <section className="paper-card p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-[#2d251e]">常用记录人管理</h2>
-            <span className="text-xs text-[#7c6e5f] tabular-nums">
+            <h2 className="typo-section-title text-[#1e2c4a]">常用记录人管理</h2>
+            <span className="typo-meta text-[#7c6e5f] tabular-nums">
               共 {state.profile.recorders.length} 位
             </span>
           </div>
@@ -350,7 +340,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           <div className="divide-y divide-[#e4d5bc]">
             {state.profile.recorders.map((rec) => (
               <div key={rec} className="flex items-center justify-between py-2.5">
-                <span className="text-sm font-semibold text-[#2d251e]">{rec}</span>
+                <span className="typo-item-title text-[#2d251e]">{rec}</span>
                 <button
                   type="button"
                   onClick={() => handleRemoveRecorder(rec)}
@@ -369,12 +359,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               value={newRecorder}
               onChange={(e) => setNewRecorder(e.target.value)}
               placeholder="输入新记录人（如：阿姨、爷爷）"
-              className="min-w-0 flex-1 rounded-xl border border-[#dccbb0] bg-white px-3 py-2 text-sm text-[#2d251e]"
+              className="min-w-0 flex-1 rounded-xl border border-[#dccbb0] bg-white px-3 py-2 typo-body text-[#2d251e]"
             />
             <button
               type="button"
               onClick={handleAddRecorder}
-              className="flex min-h-[42px] shrink-0 items-center gap-1 rounded-xl bg-amber-300 px-3.5 text-xs font-bold text-slate-900 active:scale-95"
+              className="flex min-h-[42px] shrink-0 items-center gap-1 rounded-xl bg-amber-300 px-3.5 typo-tab-active text-slate-900 active:scale-95"
             >
               <UserPlus className="h-4 w-4" />
               <span>新增</span>
@@ -385,8 +375,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         {/* 3. 数据舱：打包宇宙记忆 & 解冻记忆档案 */}
         <section className="paper-card p-4 space-y-3">
           <div>
-            <h2 className="text-sm font-bold text-[#2d251e]">宇宙数据舱（本地备份与迁移）</h2>
-            <p className="mt-0.5 text-xs text-[#6e6052]">
+            <h2 className="typo-section-title text-[#1e2c4a]">宇宙数据舱（本地备份与迁移）</h2>
+            <p className="mt-0.5 typo-meta text-[#6e6052]">
               所有日记、喂养、生长坐标与疫苗护盾均可一键打包为本地 JSON 文件
             </p>
           </div>
@@ -403,7 +393,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <button
               type="button"
               onClick={handleExportMemory}
-              className="flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] bg-[#2d251e] px-4 text-sm font-bold text-amber-100 shadow-[0_6px_16px_rgba(45,37,30,0.25)] active:scale-[0.98]"
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] bg-[#2d251e] px-4 typo-cta text-amber-100 shadow-[0_6px_16px_rgba(45,37,30,0.25)] active:scale-[0.98]"
             >
               <Download className="h-4 w-4" />
               <span>打包宇宙记忆（导出备份）</span>
@@ -412,7 +402,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <button
               type="button"
               onClick={() => importInputRef.current?.click()}
-              className="flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] border-2 border-[#c8b599] bg-white/80 px-4 text-sm font-bold text-[#2d251e] active:scale-[0.98]"
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] border-2 border-[#c8b599] bg-white/80 px-4 typo-cta text-[#2d251e] active:scale-[0.98]"
             >
               <Upload className="h-4 w-4" />
               <span>解冻记忆档案（导入恢复）</span>

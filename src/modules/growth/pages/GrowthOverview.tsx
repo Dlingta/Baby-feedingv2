@@ -1,8 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
   ArrowRight,
-  Calendar,
-  ChevronLeft,
   Plus,
   Settings,
   Sparkles,
@@ -21,6 +19,8 @@ import { calculateGrowthAge } from '../calculations/ageCalculator';
 import { GrowthTabs } from '../components/GrowthTabs';
 import { GrowthChart } from '../components/GrowthChart';
 import { GrowthHistory } from '../components/GrowthHistory';
+import { GrowthHeroScene } from '../components/GrowthHeroScene';
+import { CosmicModuleHeader } from '../../../components/CosmicModuleHeader';
 
 interface GrowthOverviewProps {
   profile: GrowthBabyProfile;
@@ -143,74 +143,27 @@ export const GrowthOverview: React.FC<GrowthOverviewProps> = ({
         className="relative z-10 flex w-full min-w-0 flex-col justify-between pb-3"
       >
         <div>
-          {/* 4.1.1 页面顶部导航栏 */}
-          <header className="relative z-20 flex min-h-[54px] items-center justify-between px-4 pt-safe pb-1">
-            <button
-              type="button"
-              onClick={onBackHome}
-              aria-label="返回首页"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-[#132550]/65 text-indigo-100 backdrop-blur-sm transition-transform hover:bg-white/15 active:scale-90"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
+          {/* 4.1.1 统一手绘星空顶栏（与其他页面标题保持完全一致） */}
+          <CosmicModuleHeader
+            title="观测坐标"
+            subtitle="成长轨迹"
+            onBack={onBackHome}
+            onCalendarClick={() => setShowCalendarPanel((v) => !v)}
+            calendarActive={showCalendarPanel}
+            calendarLabel="查看成长记录日期与月龄日历"
+          />
 
-            <div className="flex items-center gap-1.5">
-              <h1 className="text-[18px] font-bold tracking-[0.1em] text-[#fffaf0] drop-shadow-[0_2px_8px_rgba(4,10,30,0.85)]">
-                观测坐标
-              </h1>
-              <span
-                className="text-[12px] text-[#fde047] drop-shadow-[0_0_6px_rgba(253,224,71,0.9)]"
-                aria-hidden="true"
-              >
-                ✦
-              </span>
-            </div>
+          {/* 全景融合插画区：星星帽宝宝 + 巴哥犬 + 蓝色土星 + 弧形草地山丘（自然融入星空） */}
+          <GrowthHeroScene
+            activeTab="overview"
+            subtitle="每一次长大，都是一次新的星际探索。"
+            onSelectOverview={() => {}}
+            onSelectAssessment={() =>
+              onGoToAssessment(selectedMeasurementId || latestMeasurement?.id)
+            }
+          />
 
-            <button
-              type="button"
-              onClick={() => setShowCalendarPanel((v) => !v)}
-              aria-label="查看成长记录日期与月龄日历"
-              className={`flex h-9 w-9 items-center justify-center rounded-xl transition-transform active:scale-90 ${
-                showCalendarPanel
-                  ? 'bg-amber-300/25 text-amber-200'
-                  : 'text-indigo-100 hover:bg-white/10'
-              }`}
-            >
-              <Calendar className="h-5 w-5" />
-            </button>
-          </header>
-
-          <div className="flex w-full min-w-0 flex-col gap-3 px-4">
-            {/* 顶部标题区 + 星星帽宝宝半身插画（不遮挡任何数据） */}
-            <div className="flex items-end justify-between gap-2 px-0.5 pt-0.5">
-              <div className="min-w-0 flex-1 pb-1">
-                <p className="text-[12px] font-medium leading-relaxed text-amber-100/90 drop-shadow">
-                  每一次长大，都是一次新的星际探索。
-                </p>
-                <div className="mt-2 inline-flex items-center rounded-full border border-white/15 bg-[#152550]/80 p-0.5 backdrop-blur-md">
-                  <button
-                    type="button"
-                    className="rounded-full bg-gradient-to-b from-[#ffe25f] via-[#facc34] to-[#f2ab1a] px-3 py-1 text-[11.5px] font-bold text-[#1f190d] shadow-xs"
-                  >
-                    走势与历史
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onGoToAssessment(selectedMeasurementId || latestMeasurement?.id)}
-                    className="rounded-full px-3 py-1 text-[11.5px] font-medium text-indigo-100/85 transition-colors hover:text-white"
-                  >
-                    专业营养评价
-                  </button>
-                </div>
-              </div>
-
-              <img
-                src="/assets/extracted/feed_boy_pug_planet.png"
-                alt="黄色星星帽宝宝与巴哥犬"
-                referrerPolicy="no-referrer"
-                className="h-[78px] w-auto shrink-0 object-contain drop-shadow-[0_6px_14px_rgba(3,8,24,0.5)]"
-              />
-            </div>
+          <div className="relative z-20 -mt-1 flex w-full min-w-0 flex-col gap-3 px-4">
 
             {/* 右上角日历展开面板：已记录日期快捷定位 + 0~3岁评估日历 */}
             {showCalendarPanel && (
@@ -299,7 +252,7 @@ export const GrowthOverview: React.FC<GrowthOverviewProps> = ({
             <button
               type="button"
               onClick={onOpenSettings}
-              className="mt-3 inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-gradient-to-b from-[#ffe25e] to-[#f4b21d] px-5 text-[13px] font-extrabold text-[#241b09] shadow-sm active:scale-95"
+              className="mt-3 inline-flex min-h-[42px] items-center gap-1.5 rounded-full bg-gradient-to-b from-[#ffe25e] to-[#f4b21d] px-5 typo-item-title text-[#241b09] shadow-sm active:scale-95"
             >
               <UserCheck className="h-4 w-4" />
               <span>创建宝宝档案</span>
@@ -310,18 +263,18 @@ export const GrowthOverview: React.FC<GrowthOverviewProps> = ({
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[15px] font-extrabold text-amber-100">
+                  <span className="typo-section-title text-amber-100">
                     {profile.name || '未知漫游者'}
                   </span>
-                  <span className="text-[11.5px] font-semibold text-sky-200">
+                  <span className="typo-meta text-sky-200">
                     · {currentAge?.isValid ? currentAge.displayAge : '未算月龄'}
                   </span>
-                  <span className="text-[11.5px] text-indigo-200/90">· {sexDisplay}</span>
+                  <span className="typo-meta text-indigo-200/90">· {sexDisplay}</span>
                   {profile.isPreterm && (
-                    <span className="text-[11px] font-semibold text-amber-300">· 早产档案</span>
+                    <span className="typo-badge text-amber-300">· 早产档案</span>
                   )}
                 </div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-indigo-200/80 tabular-nums">
+                <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 typo-meta text-indigo-200/80 tabular-nums">
                   <span>出生：{profile.birthDate.replace(/-/g, '.')}</span>
                   <span aria-hidden="true">|</span>
                   <span>
@@ -334,7 +287,7 @@ export const GrowthOverview: React.FC<GrowthOverviewProps> = ({
               <button
                 type="button"
                 onClick={onOpenSettings}
-                className="flex h-8 shrink-0 items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 text-[11px] font-semibold text-amber-100 hover:bg-white/15 active:scale-95"
+                className="flex h-8 shrink-0 items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 typo-badge text-amber-100 hover:bg-white/15 active:scale-95"
               >
                 <Settings className="h-3.5 w-3.5" />
                 <span>档案</span>
@@ -374,56 +327,56 @@ export const GrowthOverview: React.FC<GrowthOverviewProps> = ({
                 aria-hidden="true"
                 className="h-4.5 w-4.5 object-contain"
               />
-              <h2 className="text-[14.5px] font-extrabold text-[#1e2c4a]">最近一次成长记录</h2>
+              <h2 className="typo-section-title text-[#1e2c4a]">最近一次成长记录</h2>
             </div>
 
             {hasDemoRecords && (
-              <span className="text-[10.5px] font-semibold text-[#9a6a15]">含演示数据</span>
+              <span className="typo-badge text-[#9a6a15]">含演示数据</span>
             )}
           </div>
 
           {!latestMeasurement ? (
-            <div className="rounded-[20px] bg-[#f7f0e2] px-3 py-5 text-center text-[12px] text-[#7a6d5e]">
+            <div className="rounded-[20px] bg-[#f7f0e2] px-3 py-5 text-center typo-meta text-[#7a6d5e]">
               暂无成长测量数据，点击下方按钮录入第一条记录。
             </div>
           ) : (
             <>
               <div className="grid grid-cols-3 gap-2.5">
                 <div className="rounded-[20px] border border-[#e7dac3] bg-[#faf4e8] p-2.5 text-center shadow-[0_3px_10px_rgba(68,52,28,0.06)]">
-                  <div className="text-[11px] font-semibold text-[#7b6e5f]">身长/身高</div>
-                  <div className="mt-0.5 font-typewriter text-[15px] font-extrabold text-[#1e2c4a] tabular-nums">
+                  <div className="typo-badge text-[#7b6e5f]">身长/身高</div>
+                  <div className="mt-0.5 font-typewriter text-[15px] typo-num text-[#1e2c4a]">
                     {typeof latestMeasurement.heightCm === 'number'
                       ? `${latestMeasurement.heightCm.toFixed(1)}`
                       : '--'}
-                    <span className="ml-0.5 text-[10.5px] font-semibold">cm</span>
+                    <span className="ml-0.5 text-[11px] font-medium">cm</span>
                   </div>
-                  <div className="mt-0.5 font-typewriter text-[10.5px] font-bold text-[#2f6b2a] tabular-nums">
+                  <div className="mt-0.5 font-typewriter typo-badge text-[#2f6b2a] tabular-nums">
                     {heightDelta ? `较上次 ${heightDelta}` : '首次记录'}
                   </div>
                 </div>
 
                 <div className="rounded-[20px] border border-[#e7dac3] bg-[#faf4e8] p-2.5 text-center shadow-[0_3px_10px_rgba(68,52,28,0.06)]">
-                  <div className="text-[11px] font-semibold text-[#7b6e5f]">体重</div>
-                  <div className="mt-0.5 font-typewriter text-[15px] font-extrabold text-[#1e2c4a] tabular-nums">
+                  <div className="typo-badge text-[#7b6e5f]">体重</div>
+                  <div className="mt-0.5 font-typewriter text-[15px] typo-num text-[#1e2c4a]">
                     {typeof latestMeasurement.weightKg === 'number'
                       ? `${latestMeasurement.weightKg.toFixed(2)}`
                       : '--'}
-                    <span className="ml-0.5 text-[10.5px] font-semibold">kg</span>
+                    <span className="ml-0.5 text-[11px] font-medium">kg</span>
                   </div>
-                  <div className="mt-0.5 font-typewriter text-[10.5px] font-bold text-[#1d5fa7] tabular-nums">
+                  <div className="mt-0.5 font-typewriter typo-badge text-[#1d5fa7] tabular-nums">
                     {weightDelta ? `较上次 ${weightDelta}` : '首次记录'}
                   </div>
                 </div>
 
                 <div className="rounded-[20px] border border-[#e7dac3] bg-[#faf4e8] p-2.5 text-center shadow-[0_3px_10px_rgba(68,52,28,0.06)]">
-                  <div className="text-[11px] font-semibold text-[#7b6e5f]">头围</div>
-                  <div className="mt-0.5 font-typewriter text-[15px] font-extrabold text-[#1e2c4a] tabular-nums">
+                  <div className="typo-badge text-[#7b6e5f]">头围</div>
+                  <div className="mt-0.5 font-typewriter text-[15px] typo-num text-[#1e2c4a]">
                     {typeof latestMeasurement.headCm === 'number'
                       ? `${latestMeasurement.headCm.toFixed(1)}`
                       : '--'}
-                    <span className="ml-0.5 text-[10.5px] font-semibold">cm</span>
+                    <span className="ml-0.5 text-[11px] font-medium">cm</span>
                   </div>
-                  <div className="mt-0.5 font-typewriter text-[10.5px] font-bold text-[#9a5b08] tabular-nums">
+                  <div className="mt-0.5 font-typewriter typo-badge text-[#9a5b08] tabular-nums">
                     {headDelta ? `较上次 ${headDelta}` : '首次记录'}
                   </div>
                 </div>
@@ -436,11 +389,11 @@ export const GrowthOverview: React.FC<GrowthOverviewProps> = ({
                 className="mt-3 flex min-h-[44px] w-full items-center justify-between gap-2 rounded-[20px] border border-[#d6e0f2] bg-[#f1f6ff] px-3.5 py-2.5 text-left shadow-[0_4px_12px_rgba(30,60,114,0.08)] transition-colors hover:bg-[#e5eeff] active:scale-[0.99]"
               >
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1 text-[12px] font-extrabold text-[#1e3c72]">
+                  <div className="flex items-center gap-1 typo-item-title text-[#1e3c72]">
                     <Sparkles className="h-3.5 w-3.5 text-[#d98a18]" />
                     <span>本次营养状况评价：{latestAssessment?.overallLabel || '待计算'}</span>
                   </div>
-                  <div className="mt-0.5 truncate text-[10.5px] text-[#556b92]">
+                  <div className="mt-0.5 truncate typo-meta text-[#556b92]">
                     查看 WAZ / LAZ / WLZ / BMIZ 与头围发育监测详细报告
                   </div>
                 </div>
@@ -468,9 +421,9 @@ export const GrowthOverview: React.FC<GrowthOverviewProps> = ({
           <button
             type="button"
             onClick={onGoToCreate}
-            className="flex min-h-[48px] w-[82%] items-center justify-center gap-1.5 rounded-full border-2 border-[#fff0a6]/85 bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] px-6 text-[15px] font-extrabold tracking-wide text-[#241b09] shadow-[0_8px_22px_rgba(244,179,30,0.45),inset_0_2px_2px_rgba(255,255,255,0.65)] transition-transform hover:brightness-105 active:scale-[0.97]"
+            className="flex min-h-[48px] w-[82%] items-center justify-center gap-1.5 rounded-full border-2 border-[#fff0a6]/85 bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] px-6 typo-cta text-[#241b09] shadow-[0_8px_22px_rgba(244,179,30,0.45),inset_0_2px_2px_rgba(255,255,255,0.65)] transition-transform hover:brightness-105 active:scale-[0.97]"
           >
-            <Plus className="h-4.5 w-4.5 stroke-[2.8]" />
+            <Plus className="h-4.5 w-4.5 stroke-[2.5]" />
             <span>记录新的成长坐标</span>
           </button>
         </div>

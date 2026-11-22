@@ -3,7 +3,6 @@ import {
   Camera,
   Check,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   FileText,
   Lock,
@@ -23,6 +22,11 @@ import {
 } from '../types/planet';
 import { getCurrentTimeStr, getTodayDateStr, shiftDateStr } from '../data/initialData';
 import { AssetSlot } from '../components/Illustrations';
+import {
+  CosmicModuleHeader,
+  CosmicSubHeader,
+  HandDrawnCalendarIcon,
+} from '../components/CosmicModuleHeader';
 
 export type HealthViewMode = 'vaccine' | 'vaccine_sheet' | 'illness' | 'illness_form';
 
@@ -439,205 +443,125 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
       />
 
       {/* =================================================================
-          顶部统一导航栏：返回 | 治愈工坊 ✦ | 日历筛选/时间
-         ================================================================= */}
-      <header className="relative z-20 flex min-h-[54px] items-center justify-between px-4 pt-safe pb-1">
-        <button
-          type="button"
-          onClick={handleBackClick}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-[#132550]/65 text-indigo-100 backdrop-blur-sm transition-transform hover:bg-white/15 active:scale-90"
-          aria-label="返回"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-
-        <div className="flex items-center gap-1.5">
-          <h1 className="text-[18px] font-semibold tracking-[0.12em] text-[#fffaf0] drop-shadow-[0_2px_8px_rgba(4,10,30,0.85)]">
-            治愈工坊
-          </h1>
-          <span
-            className="text-[12px] text-[#fde047] drop-shadow-[0_0_6px_rgba(253,224,71,0.9)]"
-            aria-hidden="true"
-          >
-            ✦
-          </span>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            if (mode === 'illness_form') {
-              setShowFormTimeRow((v) => !v);
-            } else {
-              setShowHeaderPanel((v) => !v);
-            }
-          }}
-          className={`flex h-9 w-9 items-center justify-center rounded-xl transition-transform active:scale-90 ${
-            (mode === 'illness_form' ? showFormTimeRow : showHeaderPanel)
-              ? 'bg-amber-300/20 text-amber-200'
-              : 'text-indigo-100 hover:bg-white/10'
-          }`}
-          aria-label="日历与筛选"
-        >
-          <svg viewBox="0 0 28 28" className="h-6 w-6" fill="none" aria-hidden="true">
-            <rect
-              x="4"
-              y="6.5"
-              width="20"
-              height="17"
-              rx="4"
-              stroke="currentColor"
-              strokeWidth="1.9"
-            />
-            <path
-              d="M9 4V8.5M19 4V8.5M4.5 11.5H23.5"
-              stroke="currentColor"
-              strokeWidth="1.9"
-              strokeLinecap="round"
-            />
-            <circle cx="10" cy="16" r="1.2" fill="currentColor" />
-            <circle cx="14" cy="16" r="1.2" fill="currentColor" />
-            <circle cx="18" cy="16" r="1.2" fill="currentColor" />
-            <circle cx="10" cy="20" r="1.2" fill="currentColor" />
-            <circle cx="14" cy="20" r="1.2" fill="currentColor" />
-          </svg>
-        </button>
-      </header>
-
-      {/* 顶部日历展开面板（5.1 疫苗进度筛选 / 5.3 护理按日筛选） */}
-      {showHeaderPanel && mode === 'vaccine' && (
-        <div className="relative z-20 mx-4 mb-2.5 rounded-[22px] border border-white/15 bg-[#122350]/88 px-3.5 py-3 shadow-[0_10px_24px_rgba(3,8,24,0.42)] backdrop-blur-md">
-          <div className="flex items-center justify-between text-[11.5px]">
-            <span className="font-semibold text-amber-100">防御护盾进度</span>
-            <span className="font-typewriter font-bold text-amber-300 tabular-nums">
-              已接种 {activatedCount} / {state.vaccines.length} 剂
-            </span>
-          </div>
-          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/15">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-[#85d965] to-[#fde047] transition-all duration-300"
-              style={{ width: `${Math.round((activatedCount / state.vaccines.length) * 100)}%` }}
-            />
-          </div>
-          <div className="mt-2.5 grid grid-cols-3 gap-1.5">
-            {(
-              [
-                { id: 'all', label: `全部 (${state.vaccines.length})` },
-                { id: 'activated', label: `已完成 (${activatedCount})` },
-                { id: 'pending', label: `待接种 (${state.vaccines.length - activatedCount})` },
-              ] as const
-            ).map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => {
-                  setVaccineFilter(opt.id);
-                  if (opt.id !== 'all') setShowAllVaccines(true);
-                }}
-                className={`rounded-full py-1 text-[11px] font-semibold transition-all ${
-                  vaccineFilter === opt.id
-                    ? 'bg-gradient-to-b from-[#ffe260] to-[#f4b324] text-[#1f1809]'
-                    : 'bg-white/10 text-indigo-100/80 hover:bg-white/15'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {showHeaderPanel && mode === 'illness' && (
-        <div className="relative z-20 mx-4 mb-2.5 flex items-center justify-between gap-2 rounded-[22px] border border-white/15 bg-[#122350]/88 px-3.5 py-2.5 shadow-[0_10px_24px_rgba(3,8,24,0.42)] backdrop-blur-md">
-          <span className="text-[11.5px] font-medium text-indigo-100">按日期查看</span>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={careDateFilter}
-              onChange={(e) => setCareDateFilter(e.target.value)}
-              className="rounded-lg border border-white/15 bg-white/10 px-2 py-1 font-typewriter text-xs text-amber-100"
-            />
-            {careDateFilter && (
-              <button
-                type="button"
-                onClick={() => setCareDateFilter('')}
-                className="rounded-lg bg-amber-300/20 px-2 py-1 text-[11px] font-semibold text-amber-200"
-              >
-                全部
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* =================================================================
-          5.1 疫苗护盾列表页（1:1 还原图二左上 + 完整 19 剂交互优化）
+          5.1 疫苗护盾列表页（首屏完整锁定 var(--app-viewport-h)，底部主按钮下滑完整可见）
          ================================================================= */}
       {mode === 'vaccine' && (
-        <div
-          style={{ minHeight: 'calc(var(--app-viewport-h) - 54px - var(--safe-top))' }}
-          className="relative z-10 flex w-full min-w-0 max-w-full flex-1 flex-col justify-between px-4"
-        >
-          <div>
-          {/* 顶部二级模式切换胶囊：疫苗护盾 | 生病护理 */}
-          <div className="mb-1 flex justify-center">
-            <div className="inline-flex items-center rounded-full border border-white/15 bg-[#152550]/75 p-0.5 backdrop-blur-md shadow-[0_4px_14px_rgba(3,8,24,0.38)]">
-              <button
-                type="button"
-                onClick={() => onChangeMode('vaccine')}
-                className="rounded-full bg-gradient-to-b from-[#ffe25f] via-[#facc34] to-[#f2ab1a] px-4 py-1 text-[12px] font-bold text-[#1f190d] shadow-[0_2px_10px_rgba(250,204,52,0.45)]"
-              >
-                疫苗护盾
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeMode('illness')}
-                className="rounded-full px-4 py-1 text-[12px] font-medium text-indigo-100/80 transition-colors hover:text-white"
-              >
-                生病记录
-              </button>
-            </div>
-          </div>
+        <>
+          <div
+            style={{ minHeight: 'var(--app-viewport-h)' }}
+            className="relative z-10 flex w-full min-w-0 max-w-full flex-col"
+          >
+            <CosmicModuleHeader
+              title="治愈工坊"
+              subtitle="健康守护"
+              onBack={handleBackClick}
+              onCalendarClick={() => setShowHeaderPanel((v) => !v)}
+              calendarActive={showHeaderPanel}
+              calendarLabel="疫苗进度与筛选"
+            />
 
-          {/* 英雄插画区：左侧金盾标语 + 右侧持盾小男孩与巴哥犬（置于撕纸卡片后方） */}
-          <div className="relative z-10 -mb-5 flex items-end justify-between px-1 pt-1">
-            <div className="pb-6 pl-1">
-              <div className="flex items-center gap-1.5">
-                <img
-                  src="/assets/extracted/health_shield_gold.png"
-                  alt=""
-                  aria-hidden="true"
-                  className="h-9 w-8 object-contain drop-shadow-[0_0_12px_rgba(253,224,71,0.65)]"
-                />
-                <span className="text-[14.5px] font-bold tracking-wide text-[#fff8e7] drop-shadow">
-                  健康防御，
-                </span>
+            {showHeaderPanel && (
+              <div className="relative z-20 mx-4 mb-2.5 rounded-[22px] border border-white/15 bg-[#122350]/88 px-3.5 py-3 shadow-[0_10px_24px_rgba(3,8,24,0.42)] backdrop-blur-md">
+                <div className="flex items-center justify-between typo-meta">
+                  <span className="font-medium text-amber-100">防御护盾进度</span>
+                  <span className="font-typewriter typo-num text-amber-300">
+                    已接种 {activatedCount} / {state.vaccines.length} 剂
+                  </span>
+                </div>
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/15">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#85d965] to-[#fde047] transition-all duration-300"
+                    style={{ width: `${Math.round((activatedCount / state.vaccines.length) * 100)}%` }}
+                  />
+                </div>
+                <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+                  {(
+                    [
+                      { id: 'all', label: `全部 (${state.vaccines.length})` },
+                      { id: 'activated', label: `已完成 (${activatedCount})` },
+                      { id: 'pending', label: `待接种 (${state.vaccines.length - activatedCount})` },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setVaccineFilter(opt.id);
+                        if (opt.id !== 'all') setShowAllVaccines(true);
+                      }}
+                      className={`rounded-full py-1 typo-badge transition-all ${
+                        vaccineFilter === opt.id
+                          ? 'bg-gradient-to-b from-[#ffe260] to-[#f4b324] font-semibold text-[#1f1809]'
+                          : 'bg-white/10 text-indigo-100/80 hover:bg-white/15'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="mt-0.5 pl-0.5 text-[15px] font-bold tracking-wider text-[#fff8e7] drop-shadow">
-                从每一针开始
-              </div>
-              <svg viewBox="0 0 132 10" className="mt-0.5 h-2.5 w-32 opacity-90" fill="none" aria-hidden="true">
-                <path
-                  d="M2 5 Q 18 2, 34 5 T 66 5 T 98 5 T 130 5"
-                  stroke="#FACC15"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="mt-1 text-[11px] font-medium text-amber-200/85 tabular-nums">
-                护盾已激活 {activatedCount} / {state.vaccines.length} 剂
-              </div>
-            </div>
+            )}
 
-            <AssetSlot slotName="health_boy_pug_shield" showSlotTag={showSlotTag} className="shrink-0">
-              <img
-                src="/assets/extracted/health_boy_pug_shield.png"
-                alt="手持护盾的小漫游者与巴哥犬"
-                referrerPolicy="no-referrer"
-                className="h-[118px] w-auto object-contain drop-shadow-[0_8px_16px_rgba(3,8,24,0.45)]"
-              />
-            </AssetSlot>
-          </div>
+            <div className="relative z-10 flex w-full min-w-0 max-w-full flex-1 flex-col px-4 pb-3">
+              {/* 顶部二级模式切换胶囊：疫苗护盾 | 生病记录 */}
+              <div className="mb-1 flex justify-center">
+                <div className="inline-flex items-center rounded-full border border-white/15 bg-[#152550]/75 p-0.5 backdrop-blur-md shadow-[0_4px_14px_rgba(3,8,24,0.38)]">
+                  <button
+                    type="button"
+                    onClick={() => onChangeMode('vaccine')}
+                    className="rounded-full bg-gradient-to-b from-[#ffe25f] via-[#facc34] to-[#f2ab1a] px-4 py-1 typo-tab-active text-[#1f190d] shadow-[0_2px_10px_rgba(250,204,52,0.45)]"
+                  >
+                    疫苗护盾
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onChangeMode('illness')}
+                    className="rounded-full px-4 py-1 typo-tab text-indigo-100/80 transition-colors hover:text-white"
+                  >
+                    生病记录
+                  </button>
+                </div>
+              </div>
+
+              {/* 英雄插画区：左侧金盾标语 + 右侧持盾小男孩与巴哥犬（置于撕纸卡片后方） */}
+              <div className="relative z-10 -mb-5 flex items-end justify-between px-1 pt-1">
+                <div className="pb-6 pl-1">
+                  <div className="flex items-center gap-1.5">
+                    <img
+                      src="/assets/extracted/health_shield_gold.png"
+                      alt=""
+                      aria-hidden="true"
+                      className="h-9 w-8 object-contain drop-shadow-[0_0_12px_rgba(253,224,71,0.65)]"
+                    />
+                    <span className="typo-section-title text-[#fff8e7] drop-shadow">
+                      健康防御，
+                    </span>
+                  </div>
+                  <div className="mt-0.5 pl-0.5 typo-section-title text-[#fff8e7] drop-shadow">
+                    从每一针开始
+                  </div>
+                  <svg viewBox="0 0 132 10" className="mt-0.5 h-2.5 w-32 opacity-90" fill="none" aria-hidden="true">
+                    <path
+                      d="M2 5 Q 18 2, 34 5 T 66 5 T 98 5 T 130 5"
+                      stroke="#FACC15"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="mt-1 typo-meta text-amber-200/85 tabular-nums">
+                    护盾已激活 {activatedCount} / {state.vaccines.length} 剂
+                  </div>
+                </div>
+
+                <AssetSlot slotName="health_boy_pug_shield" showSlotTag={showSlotTag} className="shrink-0">
+                  <img
+                    src="/assets/extracted/health_boy_pug_shield.png"
+                    alt="手持护盾的小漫游者与巴哥犬"
+                    referrerPolicy="no-referrer"
+                    className="h-[118px] w-auto object-contain drop-shadow-[0_8px_16px_rgba(3,8,24,0.45)]"
+                  />
+                </AssetSlot>
+              </div>
 
           {/* 撕纸疫苗时间轴主卡片 */}
           <div className="diary-paper-card relative z-20 min-w-0 px-1.5 py-2">
@@ -696,17 +620,15 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
 
                     {/* 日期 + 疫苗名称与剂次 */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[#5b5349] tabular-nums">
+                      <div className="flex items-center gap-1.5 typo-meta text-[#5b5349] tabular-nums">
                         <span className="font-typewriter">{displayDate}</span>
-                        <span className="text-[10.5px] font-medium text-[#8b7f70]">
-                          · {dose.recommendedMonth}
-                        </span>
+                        <span className="text-[#8b7f70]">· {dose.recommendedMonth}</span>
                       </div>
-                      <div className="mt-0.5 truncate text-[13.5px] font-bold text-[#1e293f]">
+                      <div className="mt-0.5 truncate typo-item-title text-[#1e293f]">
                         {dose.name} {dose.doseLabel}
                       </div>
                       {isActivated && (dose.brandOrigin || dose.fundingType) && (
-                        <div className="mt-0.5 text-[10.5px] text-[#7a6f62]">
+                        <div className="mt-0.5 typo-badge text-[#7a6f62]">
                           {[dose.brandOrigin, dose.fundingType].filter(Boolean).join(' · ')}
                         </div>
                       )}
@@ -715,14 +637,14 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                     {/* 右侧手绘状态标签 */}
                     <div className="shrink-0">
                       {isActivated ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-[#b7dc9f] bg-[#d8edc9] px-2.5 py-1 text-[11.5px] font-bold text-[#3b7a24]">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-[#b7dc9f] bg-[#d8edc9] px-2.5 py-1 typo-badge text-[#3b7a24]">
                           <span>已完成</span>
                           <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#5cb844] text-white">
                             <Check className="h-2.5 w-2.5 stroke-[3]" />
                           </span>
                         </span>
                       ) : isNext ? (
-                        <span className="relative inline-flex items-center gap-1 rounded-full bg-gradient-to-b from-[#ffe25e] to-[#f4b21d] px-2.5 py-1 text-[11.5px] font-extrabold text-[#2a1f07] shadow-[0_2px_8px_rgba(244,178,29,0.45)]">
+                        <span className="relative inline-flex items-center gap-1 rounded-full bg-gradient-to-b from-[#ffe25e] to-[#f4b21d] px-2.5 py-1 typo-badge font-semibold text-[#2a1f07] shadow-[0_2px_8px_rgba(244,178,29,0.45)]">
                           <span>下一针</span>
                           <img
                             src="/assets/extracted/health_star_small.png"
@@ -732,7 +654,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                           />
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[#e3ddd2] px-2.5 py-1 text-[11.5px] font-semibold text-[#847b70]">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#e3ddd2] px-2.5 py-1 typo-badge text-[#847b70]">
                           <span>待解锁</span>
                           <Lock className="h-3 w-3 opacity-80" />
                         </span>
@@ -766,14 +688,15 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
             )}
           </div>
 
+            </div>
           </div>
 
-          {/* 底部主按钮：暖金色「疫苗打卡」 */}
-          <div className="relative z-10 mt-4 flex justify-center pb-2">
+          {/* 底部主按钮严格置于首屏之下：下滑后完整可见，首屏绝不局部露头 */}
+          <div className="relative z-10 mt-4 flex justify-center px-4 pb-3">
             <button
               type="button"
               onClick={() => openVaccineForm(defaultNextDose)}
-              className="flex min-h-[48px] w-[78%] items-center justify-center gap-2 rounded-full border-2 border-[#fff0a6]/85 bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] px-6 text-[15px] font-bold tracking-wide text-[#241b09] shadow-[0_8px_22px_rgba(244,179,30,0.45),inset_0_2px_2px_rgba(255,255,255,0.65)] transition-transform hover:brightness-105 active:scale-[0.97]"
+              className="flex min-h-[48px] w-[78%] items-center justify-center gap-2 rounded-full border-2 border-[#fff0a6]/85 bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] px-6 typo-cta text-[#241b09] shadow-[0_8px_22px_rgba(244,179,30,0.45),inset_0_2px_2px_rgba(255,255,255,0.65)] transition-transform hover:brightness-105 active:scale-[0.97]"
             >
               <img
                 src="/assets/extracted/health_icon_calendar.png"
@@ -784,34 +707,40 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               <span>疫苗打卡</span>
             </button>
           </div>
-        </div>
+        </>
       )}
 
       {/* =================================================================
-          5.2 确认接种信息页（1:1 还原图三左 + 完整 19 剂自由选择）
+          5.2 确认接种信息页（统一二级顶栏）
          ================================================================= */}
       {mode === 'vaccine_sheet' && (
-        <form
-          onSubmit={handleSaveVaccineForm}
-          className="relative z-10 flex w-full min-w-0 max-w-full flex-1 flex-col px-4 pb-safe"
-        >
-          {/* 顶部英雄插画（置于撕纸卡片后方，自然探出顶边） */}
-          <div className="relative z-10 -mb-5 flex items-end justify-between px-1 pt-0.5">
-            <div className="pb-6 pl-1">
-              <div className="flex items-center gap-1.5">
-                <img
-                  src="/assets/extracted/health_shield_gold.png"
-                  alt=""
-                  aria-hidden="true"
-                  className="h-9 w-8 object-contain drop-shadow-[0_0_12px_rgba(253,224,71,0.65)]"
-                />
-                <span className="text-[14.5px] font-bold tracking-wide text-[#fff8e7] drop-shadow">
-                  健康防御，
-                </span>
-              </div>
-              <div className="mt-0.5 pl-0.5 text-[15px] font-bold tracking-wider text-[#fff8e7] drop-shadow">
-                从每一针开始
-              </div>
+        <>
+          <CosmicSubHeader
+            title="确认接种记录"
+            onBack={handleBackClick}
+            backLabel="返回疫苗护盾"
+          />
+          <form
+            onSubmit={handleSaveVaccineForm}
+            className="relative z-10 flex w-full min-w-0 max-w-full flex-1 flex-col px-4 pb-safe"
+          >
+            {/* 顶部英雄插画（置于撕纸卡片后方，自然探出顶边） */}
+            <div className="relative z-10 -mb-5 flex items-end justify-between px-1 pt-0.5">
+              <div className="pb-6 pl-1">
+                <div className="flex items-center gap-1.5">
+                  <img
+                    src="/assets/extracted/health_shield_gold.png"
+                    alt=""
+                    aria-hidden="true"
+                    className="h-9 w-8 object-contain drop-shadow-[0_0_12px_rgba(253,224,71,0.65)]"
+                  />
+                  <span className="typo-section-title text-[#fff8e7] drop-shadow">
+                    健康防御，
+                  </span>
+                </div>
+                <div className="mt-0.5 pl-0.5 typo-section-title text-[#fff8e7] drop-shadow">
+                  从每一针开始
+                </div>
               <svg viewBox="0 0 132 10" className="mt-0.5 h-2.5 w-32 opacity-90" fill="none" aria-hidden="true">
                 <path
                   d="M2 5 Q 18 2, 34 5 T 66 5 T 98 5 T 130 5"
@@ -854,8 +783,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                 className="h-10 w-10 shrink-0 object-contain"
               />
               <div>
-                <h2 className="text-[16px] font-extrabold text-[#182746]">确认接种信息</h2>
-                <p className="text-[11.5px] text-[#7c7163]">请填写本次疫苗接种的详细信息</p>
+                <h2 className="typo-section-title text-[#182746]">确认接种信息</h2>
+                <p className="typo-meta text-[#7c7163]">请填写本次疫苗接种的详细信息</p>
               </div>
             </div>
 
@@ -1050,13 +979,13 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                 <button
                   type="button"
                   onClick={() => onChangeMode('vaccine')}
-                  className="min-h-[44px] rounded-full border border-[#dfd3be] bg-[#f5efe3] text-[14px] font-bold text-[#4a4238] shadow-xs transition-transform active:scale-95"
+                  className="min-h-[44px] rounded-full border border-[#dfd3be] bg-[#f5efe3] typo-item-title text-[#4a4238] shadow-xs transition-transform active:scale-95"
                 >
                   取消
                 </button>
                 <button
                   type="submit"
-                  className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-full border border-[#fff0a6] bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] text-[14px] font-extrabold text-[#241b09] shadow-[0_6px_16px_rgba(244,179,30,0.42),inset_0_1.5px_1.5px_rgba(255,255,255,0.65)] transition-transform active:scale-95"
+                  className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-full border border-[#fff0a6] bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] typo-cta text-[#241b09] shadow-[0_6px_16px_rgba(244,179,30,0.42),inset_0_1.5px_1.5px_rgba(255,255,255,0.65)] transition-transform active:scale-95"
                 >
                   <img
                     src="/assets/extracted/health_star_small.png"
@@ -1069,55 +998,86 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               </div>
             </div>
           </div>
-        </form>
+          </form>
+        </>
       )}
 
       {/* =================================================================
-          5.3 生病记录与病历列表页（插画置于白色撕纸卡片后方）
+          5.3 生病记录与病历列表页（首屏严格锁定 var(--app-viewport-h)，新建按钮下滑完整显现）
          ================================================================= */}
       {mode === 'illness' && (
-        <div
-          style={{ minHeight: 'calc(var(--app-viewport-h) - 54px - var(--safe-top))' }}
-          className="relative z-10 flex w-full min-w-0 max-w-full flex-1 flex-col justify-between px-4"
-        >
-          <div>
-          {/* 顶部暖心文案 + 右侧双态切换胶囊 */}
-          <div className="mb-1 flex min-w-0 items-start justify-between gap-2 px-0.5 pt-1">
-            <p className="min-w-0 text-[12px] font-medium leading-[1.45] text-[#fff8e7]/95 drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]">
-              照顾生病的小宝贝，
-              <br />
-              也要记得好好休息呀～
-            </p>
+        <>
+          <div
+            style={{ minHeight: 'var(--app-viewport-h)' }}
+            className="relative z-10 flex w-full min-w-0 max-w-full flex-col"
+          >
+            <CosmicModuleHeader
+              title="治愈工坊"
+              subtitle="健康守护"
+              onBack={handleBackClick}
+              onCalendarClick={() => setShowHeaderPanel((v) => !v)}
+              calendarActive={showHeaderPanel}
+              calendarLabel="按日期筛选生病记录"
+            />
 
-            <div className="inline-flex shrink-0 items-center rounded-full border border-white/15 bg-[#152550]/80 p-0.5 backdrop-blur-md shadow-[0_4px_12px_rgba(3,8,24,0.4)]">
-              <button
-                type="button"
-                onClick={() => onChangeMode('illness')}
-                className="rounded-full bg-gradient-to-b from-[#ffe25f] via-[#facc34] to-[#f2ab1a] px-2.5 py-1 text-[11.5px] font-bold text-[#1f190d] shadow-[0_2px_8px_rgba(250,204,52,0.4)]"
-              >
-                生病记录
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeMode('vaccine')}
-                className="rounded-full px-2.5 py-1 text-[11.5px] font-medium text-indigo-100/80 transition-colors hover:text-white"
-              >
-                疫苗护盾
-              </button>
-            </div>
-          </div>
+            {showHeaderPanel && (
+              <div className="relative z-20 mx-4 mb-2.5 flex items-center justify-between gap-2 rounded-[22px] border border-white/15 bg-[#122350]/88 px-3.5 py-2.5 shadow-[0_10px_24px_rgba(3,8,24,0.42)] backdrop-blur-md">
+                <span className="typo-meta text-indigo-100">按日期查看</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={careDateFilter}
+                    onChange={(e) => setCareDateFilter(e.target.value)}
+                    className="rounded-lg border border-white/15 bg-white/10 px-2 py-1 font-typewriter typo-meta text-amber-100"
+                  />
+                  {careDateFilter && (
+                    <button
+                      type="button"
+                      onClick={() => setCareDateFilter('')}
+                      className="rounded-lg bg-amber-300/20 px-2 py-1 typo-badge text-amber-200"
+                    >
+                      全部
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
-          {/* 英雄插画：星空被窝里熟睡的黄衣小宝宝与橘猫（置于撕纸卡片后方） */}
-          <div className="relative z-10 -mb-6 flex justify-center">
-            <AssetSlot slotName="health_sleeping_baby_cat" showSlotTag={showSlotTag}>
-              <img
-                src="/assets/extracted/health_sleeping_baby_cat.png"
-                alt="被窝里熟睡的小宝贝与橘猫"
-                referrerPolicy="no-referrer"
-                className="h-[156px] w-auto max-w-full object-contain drop-shadow-[0_8px_18px_rgba(3,8,24,0.45)]"
-              />
-            </AssetSlot>
-          </div>
+            <div className="relative z-10 flex w-full min-w-0 max-w-full flex-1 flex-col px-4 pb-3">
+              {/* 顶部二级模式切换胶囊：与疫苗页统一居中排布 */}
+              <div className="mb-1 flex justify-center">
+                <div className="inline-flex shrink-0 items-center rounded-full border border-white/15 bg-[#152550]/80 p-0.5 backdrop-blur-md shadow-[0_4px_12px_rgba(3,8,24,0.4)]">
+                  <button
+                    type="button"
+                    onClick={() => onChangeMode('vaccine')}
+                    className="rounded-full px-4 py-1 typo-tab text-indigo-100/80 transition-colors hover:text-white"
+                  >
+                    疫苗护盾
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onChangeMode('illness')}
+                    className="rounded-full bg-gradient-to-b from-[#ffe25f] via-[#facc34] to-[#f2ab1a] px-4 py-1 typo-tab-active text-[#1f190d] shadow-[0_2px_8px_rgba(250,204,52,0.4)]"
+                  >
+                    生病记录
+                  </button>
+                </div>
+              </div>
+
+              {/* 英雄插画区：暖心提示下移贴近熟睡的小朋友与小橘猫（置于撕纸卡片后方） */}
+              <div className="relative z-10 -mb-6 flex flex-col items-center pt-2">
+                <p className="relative z-20 -mb-2 text-center typo-meta text-[#fff8e7]/95 drop-shadow-[0_2px_6px_rgba(0,0,0,0.65)]">
+                  照顾生病的小宝贝，也要记得好好休息呀～
+                </p>
+                <AssetSlot slotName="health_sleeping_baby_cat" showSlotTag={showSlotTag}>
+                  <img
+                    src="/assets/extracted/health_sleeping_baby_cat.png"
+                    alt="被窝里熟睡的小宝贝与橘猫"
+                    referrerPolicy="no-referrer"
+                    className="h-[154px] w-auto max-w-full object-contain drop-shadow-[0_8px_18px_rgba(3,8,24,0.45)]"
+                  />
+                </AssetSlot>
+              </div>
 
           {/* 撕纸生病记录与病历主卡片 */}
           <div className="diary-paper-card relative z-20 min-w-0 px-1.5 pb-2.5 pt-2">
@@ -1137,7 +1097,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                     key={chip.id}
                     type="button"
                     onClick={() => setIllnessFilter(chip.id)}
-                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-colors ${
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 typo-badge transition-colors ${
                       illnessFilter === chip.id
                         ? 'bg-[#21345e] text-amber-100'
                         : 'bg-[#eee4d1] text-[#6d6153] hover:bg-[#e5d8c0]'
@@ -1147,7 +1107,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                   </button>
                 ))}
               </div>
-              <span className="shrink-0 font-typewriter text-[11px] font-semibold text-[#8c7f6f] tabular-nums">
+              <span className="shrink-0 font-typewriter typo-badge text-[#8c7f6f] tabular-nums">
                 {filteredIllnesses.length} 条
               </span>
             </div>
@@ -1155,8 +1115,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
             {filteredIllnesses.length === 0 ? (
               <div className="rounded-[20px] bg-[#f7f0e2] px-4 py-8 text-center">
                 <div className="font-display text-2xl text-[#24324e]">星球运行平稳</div>
-                <p className="mt-1 text-[12px] text-[#786b5c]">
-                  暂无对应的生病与病历记录，点击下方按钮随时记录
+                <p className="mt-1 typo-meta text-[#786b5c]">
+                  暂无对应的生病与病历记录，向下滑动点击按钮随时记录
                 </p>
               </div>
             ) : (
@@ -1213,29 +1173,29 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-1">
                               <span
-                                className={`truncate text-[14px] font-extrabold ${
+                                className={`truncate typo-item-title ${
                                   isOverheat ? 'text-[#c93524]' : 'text-[#1c2b48]'
                                 }`}
                               >
                                 {diseaseLabel}
                               </span>
                               {isOverheat && (
-                                <span className="shrink-0 rounded-full bg-[#e05240]/15 px-1.5 py-0.5 text-[10px] font-extrabold text-[#c93524]">
+                                <span className="shrink-0 rounded-full bg-[#e05240]/15 px-1.5 py-0.5 typo-badge text-[#c93524]">
                                   体温过载
                                 </span>
                               )}
                               {withCase && (
-                                <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[#dde8fb] px-1.5 py-0.5 text-[10px] font-bold text-[#2b5298]">
+                                <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[#dde8fb] px-1.5 py-0.5 typo-badge text-[#2b5298]">
                                   <FileText className="h-2.5 w-2.5" />
                                   <span>病历</span>
                                 </span>
                               )}
                             </div>
-                            <div className="mt-0.5 truncate text-[11px] font-medium text-[#6f6357] tabular-nums">
+                            <div className="mt-0.5 truncate typo-meta text-[#6f6357] tabular-nums">
                               {metaLine}
                             </div>
                             {shortHospital && (
-                              <div className="mt-0.5 truncate text-[10.5px] font-medium text-[#4a6594]">
+                              <div className="mt-0.5 truncate typo-badge text-[#4a6594]">
                                 就诊：{shortHospital}
                               </div>
                             )}
@@ -1249,7 +1209,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                               e.stopPropagation();
                               onToggleIllnessHandled(rec.id);
                             }}
-                            className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition-transform active:scale-95 ${
+                            className={`rounded-full px-2.5 py-1 typo-badge transition-transform active:scale-95 ${
                               rec.handled
                                 ? 'bg-[#d8edc9] text-[#3b7a24]'
                                 : isOverheat
@@ -1294,7 +1254,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                           {/* 病历档案区块 */}
                           {withCase && (
                             <div className="rounded-xl border border-[#d6e0f2] bg-[#f1f6ff]/90 p-2.5 space-y-1.5">
-                              <div className="flex items-center gap-1.5 text-[11.5px] font-extrabold text-[#23437a]">
+                              <div className="flex items-center gap-1.5 typo-meta font-semibold text-[#23437a]">
                                 <FileText className="h-3.5 w-3.5" />
                                 <span>就诊病历档案</span>
                               </div>
@@ -1366,30 +1326,51 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
             )}
           </div>
 
+            </div>
           </div>
 
-          {/* 底部暖金色主按钮：+ 新建生病记录 */}
-          <div className="relative z-10 mt-4 flex justify-center pb-2">
+          {/* 底部暖金色主按钮严格置于首屏之下：下滑后完整可见，首屏绝不露出一丁点 */}
+          <div className="relative z-10 mt-4 flex justify-center px-4 pb-3">
             <button
               type="button"
               onClick={() => openCreateIllnessForm('发烧')}
-              className="flex min-h-[48px] w-[78%] items-center justify-center gap-1.5 rounded-full border-2 border-[#fff0a6]/85 bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] px-6 text-[15px] font-bold tracking-wide text-[#241b09] shadow-[0_8px_22px_rgba(244,179,30,0.45),inset_0_2px_2px_rgba(255,255,255,0.65)] transition-transform hover:brightness-105 active:scale-[0.97]"
+              className="flex min-h-[48px] w-[78%] items-center justify-center gap-1.5 rounded-full border-2 border-[#fff0a6]/85 bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] px-6 typo-cta text-[#241b09] shadow-[0_8px_22px_rgba(244,179,30,0.45),inset_0_2px_2px_rgba(255,255,255,0.65)] transition-transform hover:brightness-105 active:scale-[0.97]"
             >
-              <Plus className="h-4.5 w-4.5 stroke-[2.8]" />
+              <Plus className="h-4.5 w-4.5 stroke-[2.5]" />
               <span>新建生病记录</span>
             </button>
           </div>
-        </div>
+        </>
       )}
 
       {/* =================================================================
-          5.4 新建 / 编辑生病记录与病历录入页（插画置于撕纸卡片后方）
+          5.4 新建 / 编辑生病记录与病历录入页（统一二级顶栏）
          ================================================================= */}
       {mode === 'illness_form' && (
-        <form
-          onSubmit={handleSaveIllnessForm}
-          className="relative z-10 flex w-full min-w-0 max-w-full flex-1 flex-col px-4 pb-safe"
-        >
+        <>
+          <CosmicSubHeader
+            title={editingIllnessId ? '编辑生病与病历' : '新建生病记录'}
+            onBack={handleBackClick}
+            backLabel="返回生病记录"
+            rightSlot={
+              <button
+                type="button"
+                onClick={() => setShowFormTimeRow((v) => !v)}
+                className={`flex h-11 w-11 items-center justify-center rounded-xl transition-transform active:scale-90 ${
+                  showFormTimeRow
+                    ? 'bg-amber-300/20 text-amber-200'
+                    : 'text-[#c5cdfa] hover:bg-white/10'
+                }`}
+                aria-label="修改日期与时间"
+              >
+                <HandDrawnCalendarIcon />
+              </button>
+            }
+          />
+          <form
+            onSubmit={handleSaveIllnessForm}
+            className="relative z-10 flex w-full min-w-0 max-w-full flex-1 flex-col px-4 pb-safe"
+          >
           {/* 顶部英雄区：医药箱标语 + 持盾小男孩与巴哥犬（置于撕纸卡片后方） */}
           <div className="relative z-10 -mb-5 flex items-end justify-between px-1 pt-0.5">
             <div className="pb-6 pl-1">
@@ -1457,10 +1438,10 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                 className="h-10 w-9 shrink-0 object-contain"
               />
               <div>
-                <h2 className="text-[16px] font-extrabold text-[#182746]">
+                <h2 className="typo-section-title text-[#182746]">
                   {editingIllnessId ? '编辑生病记录与病历' : '新建生病记录'}
                 </h2>
-                <p className="text-[11.5px] text-[#7c7163]">记录疾病情况、用药与就诊病历~</p>
+                <p className="typo-meta text-[#7c7163]">记录疾病情况、用药与就诊病历~</p>
               </div>
             </div>
 
@@ -1672,7 +1653,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               {/* 5. 录入病历区块（就诊医院 / 医生诊断 / 病历与化验单照片） */}
               <div className="rounded-[20px] border border-[#d6e0f2] bg-[#f2f6ff]/85 p-3 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-[13px] font-extrabold text-[#1e3c72]">
+                  <div className="flex items-center gap-1.5 typo-body font-semibold text-[#1e3c72]">
                     <img
                       src="/assets/extracted/health_firstaid_kit.png"
                       alt=""
@@ -1772,13 +1753,13 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                 <button
                   type="button"
                   onClick={() => onChangeMode('illness')}
-                  className="min-h-[44px] rounded-full border border-[#dfd3be] bg-[#f5efe3] text-[14px] font-bold text-[#4a4238] shadow-xs transition-transform active:scale-95"
+                  className="min-h-[44px] rounded-full border border-[#dfd3be] bg-[#f5efe3] typo-item-title text-[#4a4238] shadow-xs transition-transform active:scale-95"
                 >
                   取消
                 </button>
                 <button
                   type="submit"
-                  className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-full border border-[#fff0a6] bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] text-[14px] font-extrabold text-[#241b09] shadow-[0_6px_16px_rgba(244,179,30,0.42),inset_0_1.5px_1.5px_rgba(255,255,255,0.65)] transition-transform active:scale-95"
+                  className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-full border border-[#fff0a6] bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] typo-cta text-[#241b09] shadow-[0_6px_16px_rgba(244,179,30,0.42),inset_0_1.5px_1.5px_rgba(255,255,255,0.65)] transition-transform active:scale-95"
                 >
                   <img
                     src="/assets/extracted/health_star_small.png"
@@ -1791,7 +1772,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               </div>
             </div>
           </div>
-        </form>
+          </form>
+        </>
       )}
 
       {/* 病历照片全屏大图灯箱 */}

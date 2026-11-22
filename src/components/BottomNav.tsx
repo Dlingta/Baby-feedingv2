@@ -13,7 +13,6 @@ interface NavItemConfig {
   slotName: string;
   iconSrc: string;
   iconClass: string;
-  isGrowth?: boolean;
 }
 
 const NAV_ITEMS: NavItemConfig[] = [
@@ -44,7 +43,6 @@ const NAV_ITEMS: NavItemConfig[] = [
     slotName: 'tab_growth',
     iconSrc: '/assets/extracted/icon_sprout.png',
     iconClass: 'h-9 w-auto',
-    isGrowth: true,
   },
   {
     tab: 'health',
@@ -102,20 +100,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               aria-label={item.label}
               aria-current={isActive ? 'page' : undefined}
             >
-              {/* 成长观测坐标专属金黄色高亮光晕 */}
-              {isActive && item.isGrowth && (
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute h-11 w-11 rounded-full bg-amber-300/25 ring-2 ring-amber-300/80 shadow-[0_0_18px_rgba(253,224,71,0.8)]"
-                />
-              )}
-
               <div
                 className={`relative flex h-11 items-center justify-center transition-all duration-200 ${
                   isActive
-                    ? item.isGrowth
-                      ? 'scale-115 drop-shadow-[0_0_16px_rgba(253,224,71,0.95)]'
-                      : 'scale-110 drop-shadow-[0_0_14px_rgba(253,224,71,0.85)]'
+                    ? 'scale-110 drop-shadow-[0_0_14px_rgba(253,224,71,0.85)]'
                     : 'opacity-80 group-hover:opacity-100 group-hover:scale-105'
                 }`}
               >
@@ -125,25 +113,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   referrerPolicy="no-referrer"
                   className={`${item.iconClass} select-none object-contain`}
                 />
-                {item.isGrowth && (
-                  <img
-                    src="/assets/extracted/health_star_small.png"
-                    alt=""
-                    aria-hidden="true"
-                    className={`pointer-events-none absolute -right-1 -top-0.5 h-3.5 w-3.5 object-contain transition-opacity ${
-                      isActive
-                        ? 'opacity-100 drop-shadow-[0_0_6px_rgba(253,224,71,1)]'
-                        : 'opacity-75'
-                    }`}
-                  />
-                )}
               </div>
-
-              {isActive && item.isGrowth && (
-                <span className="mt-0.5 text-[9.5px] font-extrabold tracking-wide text-[#fde047] drop-shadow-[0_0_6px_rgba(253,224,71,0.8)]">
-                  成长
-                </span>
-              )}
 
               {showSlotTag && (
                 <span className="absolute -top-1 right-0.5 rounded bg-amber-300 px-1 text-[8.5px] font-mono text-slate-900">

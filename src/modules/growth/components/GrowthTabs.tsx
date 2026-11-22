@@ -51,10 +51,10 @@ export const GrowthTabs: React.FC<GrowthTabsProps> = ({
             role="tab"
             aria-selected={isActive}
             onClick={() => onChangeMetric(tab.key)}
-            className={`relative flex min-h-[42px] items-center justify-center gap-1.5 rounded-full px-2.5 text-[13px] font-bold whitespace-nowrap transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 ${
+            className={`relative flex min-h-[42px] items-center justify-center gap-1.5 rounded-full px-2.5 whitespace-nowrap transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 ${
               isActive
-                ? 'bg-gradient-to-b from-[#fff5d6] to-[#f8e6b4] text-[#22293e] shadow-[0_3px_12px_rgba(250,204,52,0.4),inset_0_1px_0_rgba(255,255,255,0.9)]'
-                : 'text-indigo-100/85 hover:bg-white/10 hover:text-white'
+                ? 'bg-gradient-to-b from-[#fff5d6] to-[#f8e6b4] typo-tab-active text-[#22293e] shadow-[0_3px_12px_rgba(250,204,52,0.4),inset_0_1px_0_rgba(255,255,255,0.9)]'
+                : 'typo-tab text-indigo-100/85 hover:bg-white/10 hover:text-white'
             }`}
           >
             <img

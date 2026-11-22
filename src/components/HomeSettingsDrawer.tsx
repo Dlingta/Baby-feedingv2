@@ -111,7 +111,7 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <Sparkles className="h-4 w-4 text-amber-300" />
-              <h2 className="text-[16px] font-extrabold tracking-wide text-[#fffaf0]">
+              <h2 className="typo-nav-title text-[#fffaf0]">
                 星际设置
               </h2>
             </div>
@@ -126,16 +126,16 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
           </div>
 
           {/* 宝宝档案速览卡 */}
-          <div className="paper-card-soft px-4 py-3.5 text-[#2d251e]">
+          <div className="diary-paper-card px-2 py-2 text-[#2d251e]">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[20px] bg-amber-100 text-amber-700 shadow-inner">
                 <Baby className="h-6 w-6" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[15px] font-extrabold text-[#1d2b4f]">
+                <div className="truncate typo-section-title text-[#1d2b4f]">
                   {babyName || '未知漫游者'}
                 </div>
-                <div className="mt-0.5 text-[11.5px] text-[#786858]">
+                <div className="mt-0.5 typo-meta text-[#786858]">
                   {state.profile.birthDate
                     ? `${sexLabel} · 已登陆第 ${ageInfo?.days ?? 1} 天`
                     : '尚未完善宝宝档案'}
@@ -146,7 +146,7 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
             <button
               type="button"
               onClick={() => handleGo('settings')}
-              className="mt-3.5 flex min-h-[44px] w-full items-center justify-between rounded-[20px] bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] px-4 py-2.5 text-[13.5px] font-extrabold text-[#241b09] shadow-[0_6px_16px_rgba(244,179,30,0.36)] transition-transform hover:brightness-105 active:scale-[0.98]"
+              className="mt-3.5 flex min-h-[44px] w-full items-center justify-between rounded-[20px] bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] px-4 py-2.5 typo-item-title text-[#241b09] shadow-[0_6px_16px_rgba(244,179,30,0.36)] transition-transform hover:brightness-105 active:scale-[0.98]"
             >
               <span className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
@@ -158,7 +158,7 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
 
           {/* 快捷直达区 */}
           <div className="flex flex-col gap-2.5">
-            <div className="px-1 text-[11.5px] font-semibold tracking-wider text-indigo-200/75">
+            <div className="px-1 typo-meta font-medium tracking-wider text-indigo-200/75">
               星球快捷入口
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -168,8 +168,8 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
                 className="flex flex-col items-start gap-1.5 rounded-[20px] border border-white/12 bg-[#16295c]/65 p-3 text-left shadow-[0_6px_16px_rgba(3,8,24,0.3)] transition-colors hover:bg-[#1c3470]/75 active:scale-95"
               >
                 <BookHeart className="h-5 w-5 text-amber-300" />
-                <span className="text-[13px] font-bold text-[#fffaf0]">星光日记</span>
-                <span className="text-[11px] text-indigo-200/75">
+                <span className="typo-item-title text-[#fffaf0]">星光碎片</span>
+                <span className="typo-badge text-indigo-200/75">
                   已记 {state.diaries.length} 篇
                 </span>
               </button>
@@ -180,8 +180,8 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
                 className="flex flex-col items-start gap-1.5 rounded-[20px] border border-white/12 bg-[#16295c]/65 p-3 text-left shadow-[0_6px_16px_rgba(3,8,24,0.3)] transition-colors hover:bg-[#1c3470]/75 active:scale-95"
               >
                 <Milk className="h-5 w-5 text-sky-300" />
-                <span className="text-[13px] font-bold text-[#fffaf0]">能量喂养</span>
-                <span className="text-[11px] text-indigo-200/75">
+                <span className="typo-item-title text-[#fffaf0]">能量喂养</span>
+                <span className="typo-badge text-indigo-200/75">
                   共 {state.feedings.length} 条
                 </span>
               </button>
@@ -192,8 +192,8 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
                 className="flex flex-col items-start gap-1.5 rounded-[20px] border border-white/12 bg-[#16295c]/65 p-3 text-left shadow-[0_6px_16px_rgba(3,8,24,0.3)] transition-colors hover:bg-[#1c3470]/75 active:scale-95"
               >
                 <Sprout className="h-5 w-5 text-emerald-300" />
-                <span className="text-[13px] font-bold text-[#fffaf0]">观测坐标</span>
-                <span className="text-[11px] text-indigo-200/75">
+                <span className="typo-item-title text-[#fffaf0]">观测坐标</span>
+                <span className="typo-badge text-indigo-200/75">
                   共 {state.growths.length} 次测量
                 </span>
               </button>
@@ -204,8 +204,8 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
                 className="flex flex-col items-start gap-1.5 rounded-[20px] border border-white/12 bg-[#16295c]/65 p-3 text-left shadow-[0_6px_16px_rgba(3,8,24,0.3)] transition-colors hover:bg-[#1c3470]/75 active:scale-95"
               >
                 <HeartPulse className="h-5 w-5 text-rose-300" />
-                <span className="text-[13px] font-bold text-[#fffaf0]">治愈工坊</span>
-                <span className="text-[11px] text-indigo-200/75">
+                <span className="typo-item-title text-[#fffaf0]">治愈工坊</span>
+                <span className="typo-badge text-indigo-200/75">
                   疫苗与生病记录
                 </span>
               </button>

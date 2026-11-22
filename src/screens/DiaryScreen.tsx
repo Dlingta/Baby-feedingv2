@@ -3,6 +3,7 @@ import { Calendar, ChevronRight, Mic, Pencil, Trash2, User, X } from 'lucide-rea
 import { DiaryEntry, DiaryMood, DiaryWeather, PlanetAppState } from '../types/planet';
 import { calculatePlanetAge, getTodayDateStr } from '../data/initialData';
 import { AssetSlot, IconStar } from '../components/Illustrations';
+import { CosmicModuleHeader, CosmicSubHeader } from '../components/CosmicModuleHeader';
 
 export type DiaryViewMode = 'list' | 'detail' | 'empty' | 'form';
 
@@ -47,18 +48,6 @@ function getWeatherSrc(weather: DiaryWeather): string {
 function getMoodOption(mood: DiaryMood) {
   return MOOD_OPTIONS.find((m) => m.id === mood) ?? MOOD_OPTIONS[0];
 }
-
-const HandDrawnBackIcon: React.FC = () => (
-  <svg viewBox="0 0 32 32" className="h-7 w-7" fill="none" aria-hidden="true">
-    <path
-      d="M25 16H7.5M14.5 8.5L7 16L14.5 23.5"
-      stroke="currentColor"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
 
 export const DiaryScreen: React.FC<DiaryScreenProps> = ({
   state,
@@ -208,140 +197,60 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
       />
 
       {/* =================================================================
-          顶部导航栏：按当前页面视图切换（列表 / 独立详情 / 新建编辑）
+          顶部导航栏：统一手绘星空顶栏
          ================================================================= */}
       {mode === 'detail' && activeDetail && !isEmptyView ? (
-        <header className="relative z-20 flex min-h-[56px] items-center justify-between px-4 pt-safe pb-1">
-          <button
-            type="button"
-            onClick={() => onChangeMode('list')}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-[#c5cdfa] transition-transform hover:bg-white/10 active:scale-90"
-            aria-label="返回日记列表"
-          >
-            <HandDrawnBackIcon />
-          </button>
-
-          <h1 className="text-[18px] font-medium tracking-[0.12em] text-[#fffaf0] drop-shadow-[0_2px_8px_rgba(4,10,30,0.8)]">
-            日记详情
-          </h1>
-
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => openEditForm(activeDetail, true)}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-[#d7defd] transition-colors hover:bg-white/10 active:scale-90"
-              aria-label="编辑日记"
-            >
-              <Pencil className="h-[18px] w-[18px]" />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDeleteEntry(activeDetail.id)}
-              className="flex h-9 items-center gap-0.5 rounded-xl px-1.5 text-rose-400 transition-colors hover:bg-rose-500/15 active:scale-90"
-              aria-label="删除日记"
-            >
-              <Trash2 className="h-[18px] w-[18px]" />
-              <span className="text-[11px] font-medium text-indigo-100/85">删</span>
-            </button>
-          </div>
-        </header>
-      ) : mode === 'form' ? (
-        <header className="relative z-20 flex min-h-[56px] items-center justify-between px-4 pt-safe pb-1">
-          <button
-            type="button"
-            onClick={() => onChangeMode(returnToDetailAfterForm ? 'detail' : 'list')}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-[#c5cdfa] transition-transform hover:bg-white/10 active:scale-90"
-            aria-label="返回"
-          >
-            <HandDrawnBackIcon />
-          </button>
-
-          <h1 className="text-[17px] font-medium tracking-[0.08em] text-[#fffaf0] drop-shadow-[0_2px_8px_rgba(4,10,30,0.8)]">
-            {editingId ? '编辑今日的星光' : '写下今日的星光'}
-          </h1>
-
-          <button
-            type="button"
-            onClick={handleSaveEntry}
-            disabled={!formContent.trim()}
-            className="min-h-[32px] rounded-full bg-[#f9cf4c] px-4 py-1 text-[13px] font-bold text-[#182848] shadow-[0_2px_10px_rgba(249,207,76,0.45)] transition-transform active:scale-95 disabled:opacity-50"
-          >
-            保存
-          </button>
-        </header>
-      ) : (
-        <header className="relative z-20 flex items-start justify-between px-4 pb-1 pt-safe">
-          <div className="flex items-start gap-1.5">
-            <button
-              type="button"
-              onClick={onBackHome}
-              className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl text-[#c5cdfa] transition-transform hover:bg-white/10 active:scale-90"
-              aria-label="返回首页"
-            >
-              <HandDrawnBackIcon />
-            </button>
-
-            <div className="pt-0.5 transform -rotate-[5deg] origin-left">
-              <div className="flex items-center gap-1.5">
-                <h1 className="font-display text-[25px] leading-none tracking-wider text-[#fffaf0] drop-shadow-[0_2px_8px_rgba(4,10,30,0.85)]">
-                  星光碎片
-                </h1>
-                <svg viewBox="0 0 24 24" className="h-4.5 w-4.5 -mt-1 shrink-0" fill="none" aria-hidden="true">
-                  <path
-                    d="M12 2.5L14.3 8.4L20.5 8.8L15.7 12.8L17.2 19L12 15.6L6.8 19L8.3 12.8L3.5 8.8L9.7 8.4L12 2.5Z"
-                    stroke="#FACC15"
-                    strokeWidth="2"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-              <div className="mt-1 flex flex-col items-center">
-                <span className="text-[11.5px] font-medium tracking-[0.22em] text-[#eef2ff]/95 drop-shadow">
-                  成长日记
-                </span>
-                <svg viewBox="0 0 110 10" className="-mt-0.5 h-2.5 w-24 opacity-90" fill="none" aria-hidden="true">
-                  <path
-                    d="M4 7 Q 52 2, 102 6 M96 3 L103 6 L96 8.5"
-                    stroke="#FDE68A"
-                    strokeWidth="1.3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
+        <CosmicSubHeader
+          title="日记详情"
+          onBack={() => onChangeMode('list')}
+          backLabel="返回日记列表"
+          rightSlot={
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => openEditForm(activeDetail, true)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-[#d7defd] transition-colors hover:bg-white/10 active:scale-90"
+                aria-label="编辑日记"
+              >
+                <Pencil className="h-[18px] w-[18px]" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteEntry(activeDetail.id)}
+                className="flex h-9 items-center gap-0.5 rounded-xl px-1.5 text-rose-400 transition-colors hover:bg-rose-500/15 active:scale-90"
+                aria-label="删除日记"
+              >
+                <Trash2 className="h-[18px] w-[18px]" />
+                <span className="typo-badge text-indigo-100/85">删</span>
+              </button>
             </div>
-          </div>
-
-          <IconStar className="pointer-events-none mt-1.5 h-6 w-6 drop-shadow-[0_0_12px_rgba(253,224,71,0.95)]" />
-
-          <button
-            type="button"
-            onClick={() => setShowDateFilter((v) => !v)}
-            className={`flex h-11 w-11 items-center justify-center rounded-xl transition-transform active:scale-90 ${
-              filterDate || showDateFilter
-                ? 'bg-amber-300/20 text-amber-200'
-                : 'text-[#c5cdfa] hover:bg-white/10'
-            }`}
-            aria-label="按日期筛选日记"
-          >
-            <svg viewBox="0 0 36 36" className="h-8 w-8" fill="none" aria-hidden="true">
-              <rect x="6" y="9" width="24" height="21" rx="5.5" stroke="currentColor" strokeWidth="2.4" />
-              <path
-                d="M12 6V11.5M24 6V11.5M6.5 15.5H29.5"
-                stroke="currentColor"
-                strokeWidth="2.4"
-                strokeLinecap="round"
-              />
-              <path
-                d="M12.5 21.5C13.8 20 15.5 20.3 15.5 22C15.5 23.4 13.5 24 12.5 24.5H16M20.5 21.2C21.5 20.2 23.2 20.4 23.2 22C23.2 23.5 21.4 24.4 20.5 24.6H23.8"
-                stroke="currentColor"
-                strokeWidth="1.9"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        </header>
+          }
+        />
+      ) : mode === 'form' ? (
+        <CosmicSubHeader
+          title={editingId ? '编辑今日的星光' : '写下今日的星光'}
+          onBack={() => onChangeMode(returnToDetailAfterForm ? 'detail' : 'list')}
+          backLabel="返回"
+          rightSlot={
+            <button
+              type="button"
+              onClick={handleSaveEntry}
+              disabled={!formContent.trim()}
+              className="min-h-[32px] rounded-full bg-[#f9cf4c] px-4 py-1 typo-tab-active text-[#182848] shadow-[0_2px_10px_rgba(249,207,76,0.45)] transition-transform active:scale-95 disabled:opacity-50"
+            >
+              保存
+            </button>
+          }
+        />
+      ) : (
+        <CosmicModuleHeader
+          title="星光碎片"
+          subtitle="成长日记"
+          onBack={onBackHome}
+          onCalendarClick={() => setShowDateFilter((v) => !v)}
+          calendarActive={Boolean(filterDate || showDateFilter)}
+          calendarLabel="按日期筛选日记"
+        />
       )}
 
       {/* 日期检索展开条 (仅一级列表页显示) */}

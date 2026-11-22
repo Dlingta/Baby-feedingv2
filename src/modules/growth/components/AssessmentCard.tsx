@@ -50,16 +50,16 @@ export const AssessmentCard: React.FC<AssessmentCardProps> = ({
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <h4 className="truncate text-[14px] font-extrabold text-[#1e2c4a]">
+              <h4 className="truncate typo-item-title text-[#1e2c4a]">
                 {indicator.title}
               </h4>
-              <span className="font-typewriter text-[11px] font-bold text-[#7c6e5e]">
+              <span className="font-typewriter typo-badge text-[#7c6e5e]">
                 {indicator.shortLabel}
               </span>
             </div>
-            <div className="mt-0.5 text-[11.5px] font-semibold text-[#5b5044] tabular-nums">
+            <div className="mt-0.5 typo-meta text-[#5b5044] tabular-nums">
               当前值：
-              <strong className="font-typewriter text-[#1e2c4a]">
+              <strong className="font-typewriter typo-num text-[#1e2c4a]">
                 {indicator.rawValue !== null
                   ? `${indicator.rawValue} ${indicator.unit}`
                   : '未录入'}
@@ -77,7 +77,7 @@ export const AssessmentCard: React.FC<AssessmentCardProps> = ({
         <button
           type="button"
           onClick={() => onShowExplanation(indicator)}
-          className="inline-flex min-h-[30px] shrink-0 items-center gap-0.5 rounded-full border border-[#dfd1b8] bg-[#f4ebda] px-2 text-[11px] font-bold text-[#2b4474] hover:bg-[#ebdfc7] active:scale-95"
+          className="inline-flex min-h-[30px] shrink-0 items-center gap-0.5 rounded-full border border-[#dfd1b8] bg-[#f4ebda] px-2 typo-badge text-[#2b4474] hover:bg-[#ebdfc7] active:scale-95"
         >
           <HelpCircle className="h-3.5 w-3.5" />
           <span>说明</span>
@@ -86,10 +86,10 @@ export const AssessmentCard: React.FC<AssessmentCardProps> = ({
 
       {/* Z-score / 百分位数 / 评价结果（颜色+文字双重呈现） */}
       <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-[#e6d8c0] pt-2">
-        <div className="flex items-center gap-3 font-typewriter text-[11.5px] text-[#4c4237] tabular-nums">
+        <div className="flex items-center gap-3 font-typewriter typo-meta text-[#4c4237] tabular-nums">
           <span>
             Z-score：
-            <strong className="text-[#1e2c4a]">
+            <strong className="typo-num text-[#1e2c4a]">
               {indicator.zScore !== null
                 ? `${indicator.zScore >= 0 ? '+' : ''}${indicator.zScore.toFixed(2)}`
                 : '待计算'}
@@ -98,24 +98,24 @@ export const AssessmentCard: React.FC<AssessmentCardProps> = ({
           <span className="text-[#cbbba3]" aria-hidden="true">·</span>
           <span>
             百分位：
-            <strong className="text-[#1e2c4a]">{indicator.percentileLabel}</strong>
+            <strong className="typo-num text-[#1e2c4a]">{indicator.percentileLabel}</strong>
           </span>
         </div>
 
         <span
-          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-extrabold ${badgeCls}`}
+          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 typo-badge font-semibold ${badgeCls}`}
         >
           {indicator.statusLabel}
         </span>
       </div>
 
       {indicator.conversionNote && (
-        <div className="mt-1.5 text-[10.5px] font-medium text-[#9a5b08]">
+        <div className="mt-1.5 typo-badge text-[#9a5b08]">
           {indicator.conversionNote}
         </div>
       )}
 
-      <div className="mt-1 text-[10.5px] text-[#837565]">
+      <div className="mt-1 typo-badge text-[#837565]">
         参考标准：{indicator.referenceStandard}
       </div>
     </div>

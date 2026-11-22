@@ -815,29 +815,29 @@ export const GrowthChart: React.FC<GrowthChartProps> = ({
                 · {activeNode.displayAge}（{activeNode.month.toFixed(1)}月龄）
               </span>
             </div>
-            <span className="shrink-0 font-typewriter text-[15px] font-extrabold text-[#b45309] tabular-nums">
+            <span className="shrink-0 font-typewriter text-[15px] typo-num text-[#b45309]">
               {activeNode.rawValue} {meta.unit}
             </span>
           </div>
 
           <div className="mt-2 grid grid-cols-3 gap-2 text-center">
             <div className="rounded-xl bg-[#f3e9d4] px-2 py-1.5">
-              <div className="text-[10px] text-[#7a6d5e]">Z-score</div>
-              <div className="mt-0.5 font-typewriter text-[12.5px] font-extrabold text-[#1e2c4a] tabular-nums">
+              <div className="typo-badge text-[#7a6d5e]">Z-score</div>
+              <div className="mt-0.5 font-typewriter text-[13px] typo-num text-[#1e2c4a]">
                 {activeNode.zScore !== null
                   ? `${activeNode.zScore >= 0 ? '+' : ''}${activeNode.zScore.toFixed(2)}`
                   : '待计算'}
               </div>
             </div>
             <div className="rounded-xl bg-[#f3e9d4] px-2 py-1.5">
-              <div className="text-[10px] text-[#7a6d5e]">百分位数</div>
-              <div className="mt-0.5 font-typewriter text-[12.5px] font-extrabold text-[#1e2c4a] tabular-nums">
+              <div className="typo-badge text-[#7a6d5e]">百分位数</div>
+              <div className="mt-0.5 font-typewriter text-[13px] typo-num text-[#1e2c4a]">
                 {activeNode.percentileLabel}
               </div>
             </div>
             <div className="rounded-xl bg-[#f3e9d4] px-2 py-1.5">
-              <div className="text-[10px] text-[#7a6d5e]">参考评价</div>
-              <div className="mt-0.5 truncate text-[11.5px] font-extrabold text-[#2e6b2a]">
+              <div className="typo-badge text-[#7a6d5e]">参考评价</div>
+              <div className="mt-0.5 truncate typo-meta font-semibold text-[#2e6b2a]">
                 {activeNode.statusLabel}
               </div>
             </div>

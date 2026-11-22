@@ -336,7 +336,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
       <div className="space-y-2 pt-1">
         <button
           type="submit"
-          className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-full border-2 border-[#fff0a6] bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] px-5 text-[15px] font-extrabold tracking-wide text-[#241b09] shadow-[0_8px_20px_rgba(244,179,30,0.42),inset_0_2px_2px_rgba(255,255,255,0.65)] transition-transform hover:brightness-105 active:scale-[0.98]"
+          className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-full border-2 border-[#fff0a6] bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] px-5 typo-cta text-[#241b09] shadow-[0_8px_20px_rgba(244,179,30,0.42),inset_0_2px_2px_rgba(255,255,255,0.65)] transition-transform hover:brightness-105 active:scale-[0.98]"
         >
           <span>✦ {initialMeasurement ? '更新成长记录' : '保存成长记录'}</span>
         </button>
@@ -344,7 +344,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
         <button
           type="button"
           onClick={onCancel}
-          className="flex min-h-[42px] w-full items-center justify-center rounded-full border border-[#dfd2bc] bg-[#f4ece0] text-[13.5px] font-bold text-[#52483e] active:scale-[0.98]"
+          className="flex min-h-[42px] w-full items-center justify-center rounded-full border border-[#dfd2bc] bg-[#f4ece0] typo-body font-medium text-[#52483e] active:scale-[0.98]"
         >
           取消返回
         </button>
