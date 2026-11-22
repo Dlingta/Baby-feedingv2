@@ -27,6 +27,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [name, setName] = useState(state.profile.name);
   const [planetName, setPlanetName] = useState(state.profile.planetName);
   const [birthDate, setBirthDate] = useState(state.profile.birthDate);
+  const [gender, setGender] = useState<BabyProfile['gender']>(state.profile.gender);
+  const [isPreterm, setIsPreterm] = useState(Boolean(state.profile.isPreterm));
+  const [gestationalAgeWeeks, setGestationalAgeWeeks] = useState(
+    state.profile.gestationalAgeWeeks ? String(state.profile.gestationalAgeWeeks) : ''
+  );
+  const [expectedDueDate, setExpectedDueDate] = useState(state.profile.expectedDueDate || '');
   const [newRecorder, setNewRecorder] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -39,7 +45,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setName(state.profile.name);
     setPlanetName(state.profile.planetName);
     setBirthDate(state.profile.birthDate);
-  }, [state.profile.name, state.profile.planetName, state.profile.birthDate]);
+    setGender(state.profile.gender);
+    setIsPreterm(Boolean(state.profile.isPreterm));
+    setGestationalAgeWeeks(
+      state.profile.gestationalAgeWeeks ? String(state.profile.gestationalAgeWeeks) : ''
+    );
+    setExpectedDueDate(state.profile.expectedDueDate || '');
+  }, [
+    state.profile.name,
+    state.profile.planetName,
+    state.profile.birthDate,
+    state.profile.gender,
+    state.profile.isPreterm,
+    state.profile.gestationalAgeWeeks,
+    state.profile.expectedDueDate,
+  ]);
 
   const showToast = (msg: string) => {
     setFeedback(msg);
@@ -50,14 +70,23 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     e.preventDefault();
     const trimmedName = name.trim();
     const nextPlanetName = trimmedName ? `${trimmedName}的登陆手帐` : '未知漫游者的登陆手帐';
+    const parsedWeeks = gestationalAgeWeeks.trim() ? Number(gestationalAgeWeeks.trim()) : undefined;
     setPlanetName(nextPlanetName);
     onUpdateProfile({
       ...state.profile,
+      babyId: state.profile.babyId || 'baby-primary',
       name: trimmedName,
       planetName: nextPlanetName,
       birthDate,
+      gender,
+      isPreterm,
+      gestationalAgeWeeks:
+        isPreterm && typeof parsedWeeks === 'number' && Number.isFinite(parsedWeeks)
+          ? parsedWeeks
+          : undefined,
+      expectedDueDate: isPreterm && expectedDueDate ? expectedDueDate : undefined,
     });
-    showToast('星球基本档案已更新并同步');
+    showToast('星球基本档案已更新并同步（成长曲线与营养评价已自动刷新）');
   };
 
   const handleAddRecorder = () => {
@@ -115,6 +144,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         setName(parsed.profile.name);
         setPlanetName(parsed.profile.planetName);
         setBirthDate(parsed.profile.birthDate);
+        setGender(parsed.profile.gender);
+        setIsPreterm(Boolean(parsed.profile.isPreterm));
+        setGestationalAgeWeeks(
+          parsed.profile.gestationalAgeWeeks ? String(parsed.profile.gestationalAgeWeeks) : ''
+        );
+        setExpectedDueDate(parsed.profile.expectedDueDate || '');
         showToast('记忆档案解冻成功，所有星光记录已恢复');
       } catch {
         showToast('解析记忆档案失败，请检查 JSON 文件');
@@ -125,9 +160,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   };
 
   return (
-    <div className="flex min-h-full flex-col pb-6">
+    <div className="flex min-h-full w-full min-w-0 max-w-full flex-col overflow-x-clip pb-6">
       {/* 顶部栏 */}
-      <header className="sticky top-0 z-20 flex h-[56px] items-center justify-between bg-[#09132e]/85 px-4 backdrop-blur-md">
+      <header className="sticky top-0 z-20 flex min-h-[56px] items-center justify-between bg-[#09132e]/88 px-4 pt-safe pb-2 backdrop-blur-md">
         <button
           type="button"
           onClick={onBackHome}
@@ -145,9 +180,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         <div className="w-[44px]" />
       </header>
 
-      <div className="flex flex-col gap-4 px-4 pt-2">
+      <div className="flex flex-col gap-4 px-4 pt-3">
         {feedback && (
-          <div className="flex items-center gap-2 rounded-2xl bg-emerald-500/20 border border-emerald-300/40 px-3.5 py-2.5 text-xs font-semibold text-emerald-100">
+          <div className="flex items-center gap-2 rounded-[20px] bg-emerald-500/20 border border-emerald-300/40 px-4 py-3 text-xs font-semibold text-emerald-100 shadow-[0_8px_20px_rgba(3,8,24,0.3)]">
             <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-300" />
             <span>{feedback}</span>
           </div>
@@ -200,6 +235,90 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             />
           </label>
 
+          {/* 生理性别：用于匹配 WHO 男女儿童生长参考标准 */}
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-[#6e6052]">生理性别（WHO 参考曲线匹配）</span>
+              <span className="text-[10.5px] text-[#8b7a66]">用于成长曲线与营养评价</span>
+            </div>
+            <div className="mt-1.5 grid grid-cols-3 gap-2">
+              {(
+                [
+                  { id: 'boy', label: '男宝' },
+                  { id: 'girl', label: '女宝' },
+                  { id: 'star', label: '暂不设置' },
+                ] as const
+              ).map((opt) => {
+                const active = gender === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setGender(opt.id)}
+                    className={`min-h-[40px] rounded-xl border text-xs font-bold transition-all active:scale-[0.98] ${
+                      active
+                        ? 'border-[#d6a335] bg-[#fce38a] text-[#2d251e] shadow-xs'
+                        : 'border-[#dccbb0] bg-white/90 text-[#6e6052] hover:bg-[#f7efe0]'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            {gender === 'star' && (
+              <p className="mt-1 text-[11px] text-amber-800">
+                未设置生理性别时，成长模块将不会套用 WHO 性别标准曲线，营养评价将显示「数据不足」。
+              </p>
+            )}
+          </div>
+
+          {/* 早产儿档案开关与条件字段 */}
+          <div className="rounded-xl border border-[#e3d4bc] bg-[#faf3e4]/80 p-3 space-y-2.5">
+            <label className="flex cursor-pointer items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-[#2d251e]">是否为早产儿（胎龄 &lt; 37 周）</div>
+                <div className="text-[10.5px] text-[#7c6e5f]">
+                  早产儿校正月龄规则需由儿保医生确认，系统不会擅自覆盖实际月龄
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={isPreterm}
+                onChange={(e) => setIsPreterm(e.target.checked)}
+                className="h-4 w-4 accent-[#1b336b]"
+              />
+            </label>
+
+            {isPreterm && (
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
+                <label className="block">
+                  <span className="text-[11px] font-semibold text-[#6e6052]">出生孕周（22～36 周）</span>
+                  <input
+                    type="number"
+                    min={22}
+                    max={36}
+                    step={0.5}
+                    value={gestationalAgeWeeks}
+                    onChange={(e) => setGestationalAgeWeeks(e.target.value)}
+                    placeholder="如：34"
+                    className="mt-1 w-full rounded-xl border border-[#dccbb0] bg-white px-2.5 py-2 text-xs font-typewriter text-[#2d251e]"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-[11px] font-semibold text-[#6e6052]">预产期（选填）</span>
+                  <input
+                    type="date"
+                    value={expectedDueDate}
+                    onChange={(e) => setExpectedDueDate(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-[#dccbb0] bg-white px-2.5 py-2 text-xs font-typewriter text-[#2d251e]"
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+
           {/* 实时年龄计算预览 */}
           <div className="rounded-xl bg-[#efe3cb] px-3.5 py-2.5">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#6e6052]">
@@ -213,7 +332,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
           <button
             type="submit"
-            className="flex min-h-[46px] w-full items-center justify-center rounded-2xl bg-[#1b336b] text-sm font-bold text-amber-100 shadow-sm active:scale-95"
+            className="flex min-h-[46px] w-full items-center justify-center rounded-[20px] bg-[#1b336b] text-sm font-bold text-amber-100 shadow-[0_6px_16px_rgba(27,51,107,0.28)] active:scale-95"
           >
             保存星球档案
           </button>
@@ -280,11 +399,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             className="hidden"
           />
 
-          <div className="grid grid-cols-1 gap-2.5">
+          <div className="grid grid-cols-1 gap-3">
             <button
               type="button"
               onClick={handleExportMemory}
-              className="flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-[#2d251e] px-4 text-sm font-bold text-amber-100 shadow-sm active:scale-[0.98]"
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] bg-[#2d251e] px-4 text-sm font-bold text-amber-100 shadow-[0_6px_16px_rgba(45,37,30,0.25)] active:scale-[0.98]"
             >
               <Download className="h-4 w-4" />
               <span>打包宇宙记忆（导出备份）</span>
@@ -293,7 +412,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <button
               type="button"
               onClick={() => importInputRef.current?.click()}
-              className="flex min-h-[48px] items-center justify-center gap-2 rounded-2xl border-2 border-[#c8b599] bg-white/80 px-4 text-sm font-bold text-[#2d251e] active:scale-[0.98]"
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] border-2 border-[#c8b599] bg-white/80 px-4 text-sm font-bold text-[#2d251e] active:scale-[0.98]"
             >
               <Upload className="h-4 w-4" />
               <span>解冻记忆档案（导入恢复）</span>

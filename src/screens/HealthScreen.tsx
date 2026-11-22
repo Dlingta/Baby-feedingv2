@@ -1,16 +1,20 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Camera,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  FileText,
   Lock,
+  Pencil,
   Plus,
   RotateCcw,
   Trash2,
+  X,
 } from 'lucide-react';
 import {
-  IllnessCareCategory,
+  DiseasePresetTag,
   IllnessRecord,
   PlanetAppState,
   VaccineBrandOrigin,
@@ -45,18 +49,29 @@ interface HealthScreenProps {
 const BRAND_OPTIONS: VaccineBrandOrigin[] = ['国产', '进口', '其他'];
 const FUNDING_OPTIONS: VaccineFundingType[] = ['免费', '自费'];
 
+const DISEASE_PRESETS: DiseasePresetTag[] = [
+  '体温异常',
+  '发烧',
+  '感冒',
+  '皮疹',
+  '咳嗽',
+  '腹泻',
+  '过敏',
+  '自定义',
+];
+
 const SYMPTOM_OPTIONS = [
   '发热',
   '咳嗽',
   '流鼻涕',
+  '皮疹',
   '呕吐',
   '腹泻',
   '食欲不振',
-  '其他',
+  '精神欠佳',
 ];
 
-const MEDICINE_PRESETS = ['退烧药', '物理降温', '益生菌', '海盐水洗鼻'];
-const WATER_PRESETS = [60, 100, 120, 150];
+type IllnessFilterKey = 'all' | 'fever' | 'respiratory' | 'skin_other' | 'with_case';
 
 /** 根据宝宝出生日期估算推荐接种日期（如“2 月龄” -> 出生后约 60 天） */
 function estimateDoseDate(birthDate: string, recommendedMonth: string): string {
@@ -77,10 +92,37 @@ function estimateDoseDate(birthDate: string, recommendedMonth: string): string {
   return recommendedMonth;
 }
 
-function getRecordCategory(rec: IllnessRecord): IllnessCareCategory {
-  if (rec.careCategory) return rec.careCategory;
-  if (rec.amountMl && rec.amountMl > 0) return 'hydration';
-  return 'temperature';
+function getDiseaseLabel(rec: IllnessRecord): string {
+  return (rec.diseaseName || rec.title || '体温异常').trim();
+}
+
+function hasMedicalCase(rec: IllnessRecord): boolean {
+  return Boolean(
+    rec.hospital?.trim() ||
+      rec.diagnosis?.trim() ||
+      (rec.casePhotos && rec.casePhotos.length > 0)
+  );
+}
+
+function isFeverLike(rec: IllnessRecord): boolean {
+  const label = getDiseaseLabel(rec);
+  return (
+    (typeof rec.temperatureC === 'number' && rec.temperatureC >= 37.5) ||
+    label.includes('烧') ||
+    label.includes('热') ||
+    label.includes('体温')
+  );
+}
+
+function getDiseaseIconSrc(rec: IllnessRecord): string {
+  const label = getDiseaseLabel(rec);
+  if (label.includes('烧') || label.includes('热') || label.includes('体温')) {
+    return '/assets/extracted/health_thermometer.png';
+  }
+  if (label.includes('感冒') || label.includes('咳') || label.includes('腹泻')) {
+    return '/assets/extracted/health_medicine_bottle.png';
+  }
+  return '/assets/extracted/health_firstaid_kit.png';
 }
 
 export const HealthScreen: React.FC<HealthScreenProps> = ({
@@ -113,23 +155,28 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
   const [vacDate, setVacDate] = useState<string>(() => getTodayDateStr());
   const [vacNote, setVacNote] = useState<string>('');
 
-  // 5.3 生病护理列表状态
-  const [careFilter, setCareFilter] = useState<'all' | IllnessCareCategory>('all');
+  // 5.3 生病记录列表状态
+  const [illnessFilter, setIllnessFilter] = useState<IllnessFilterKey>('all');
   const [careDateFilter, setCareDateFilter] = useState<string>('');
   const [expandedIllnessId, setExpandedIllnessId] = useState<string | null>(null);
+  const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
 
-  // 5.4 新建护理记录表单状态
-  const [careCategory, setCareCategory] = useState<IllnessCareCategory>('temperature');
+  // 5.4 新建 / 编辑生病记录与病历录入状态
+  const [editingIllnessId, setEditingIllnessId] = useState<string | null>(null);
+  const [selectedDiseaseTag, setSelectedDiseaseTag] = useState<DiseasePresetTag>('发烧');
+  const [customDiseaseName, setCustomDiseaseName] = useState<string>('');
   const [illDate, setIllDate] = useState<string>(() => getTodayDateStr());
   const [illTime, setIllTime] = useState<string>(() => getCurrentTimeStr());
   const [showFormTimeRow, setShowFormTimeRow] = useState(false);
   const [tempStr, setTempStr] = useState('38.5');
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>(['发热']);
-  const [medicineTitle, setMedicineTitle] = useState('退烧药');
-  const [medicineDose, setMedicineDose] = useState('1次');
-  const [waterMlStr, setWaterMlStr] = useState('120');
   const [medication, setMedication] = useState('');
+  const [hospital, setHospital] = useState('');
+  const [diagnosis, setDiagnosis] = useState('');
+  const [casePhotos, setCasePhotos] = useState<string[]>([]);
+  const [illHandled, setIllHandled] = useState(false);
   const [recorder, setRecorder] = useState(state.profile.recorders[0] || '妈妈');
+  const casePhotoInputRef = useRef<HTMLInputElement>(null);
 
   // 当从首页“去打卡”或侧栏直达 5.2 时，同步预填选中疫苗信息
   useEffect(() => {
@@ -183,19 +230,84 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
     onChangeMode('vaccine');
   };
 
-  const openIllnessForm = (defaultCat: IllnessCareCategory = 'temperature') => {
-    setCareCategory(defaultCat);
+  const openCreateIllnessForm = (preset: DiseasePresetTag = '发烧') => {
+    setEditingIllnessId(null);
+    setSelectedDiseaseTag(preset);
+    setCustomDiseaseName('');
     setIllDate(getTodayDateStr());
     setIllTime(getCurrentTimeStr());
-    setTempStr('38.5');
-    setSelectedSymptoms(['发热']);
-    setMedicineTitle('退烧药');
-    setMedicineDose('1次');
-    setWaterMlStr('120');
+    setTempStr(preset === '发烧' || preset === '体温异常' ? '38.5' : '');
+    setSelectedSymptoms(
+      preset === '发烧' || preset === '体温异常'
+        ? ['发热']
+        : preset === '感冒'
+        ? ['流鼻涕', '咳嗽']
+        : preset === '皮疹'
+        ? ['皮疹']
+        : []
+    );
     setMedication('');
+    setHospital('');
+    setDiagnosis('');
+    setCasePhotos([]);
+    setIllHandled(false);
+    setRecorder(state.profile.recorders[0] || '妈妈');
     setShowFormTimeRow(false);
     setShowHeaderPanel(false);
     onChangeMode('illness_form');
+  };
+
+  const openEditIllnessForm = (rec: IllnessRecord) => {
+    const label = getDiseaseLabel(rec);
+    const matchedPreset = DISEASE_PRESETS.find((p) => p !== '自定义' && p === label);
+    setEditingIllnessId(rec.id);
+    setSelectedDiseaseTag(matchedPreset || '自定义');
+    setCustomDiseaseName(matchedPreset ? '' : label);
+    setIllDate(rec.date);
+    setIllTime(rec.time);
+    setTempStr(typeof rec.temperatureC === 'number' ? String(rec.temperatureC) : '');
+    setSelectedSymptoms(rec.symptoms || []);
+    setMedication(rec.medication || '');
+    setHospital(rec.hospital || '');
+    setDiagnosis(rec.diagnosis || '');
+    setCasePhotos(rec.casePhotos || []);
+    setIllHandled(Boolean(rec.handled));
+    setRecorder(rec.recorder || state.profile.recorders[0] || '妈妈');
+    setShowFormTimeRow(false);
+    setShowHeaderPanel(false);
+    onChangeMode('illness_form');
+  };
+
+  const handleSelectDiseasePreset = (preset: DiseasePresetTag) => {
+    setSelectedDiseaseTag(preset);
+    if (preset === '发烧' || preset === '体温异常') {
+      if (!tempStr) setTempStr('38.5');
+      if (!selectedSymptoms.includes('发热')) {
+        setSelectedSymptoms((prev) => ['发热', ...prev]);
+      }
+    } else if (preset === '皮疹' && !selectedSymptoms.includes('皮疹')) {
+      setSelectedSymptoms((prev) => ['皮疹', ...prev]);
+    } else if (preset === '咳嗽' && !selectedSymptoms.includes('咳嗽')) {
+      setSelectedSymptoms((prev) => ['咳嗽', ...prev]);
+    } else if (preset === '腹泻' && !selectedSymptoms.includes('腹泻')) {
+      setSelectedSymptoms((prev) => ['腹泻', ...prev]);
+    }
+  };
+
+  const handleUploadCasePhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    const remainingSlots = Math.max(0, 4 - casePhotos.length);
+    files.slice(0, remainingSlots).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setCasePhotos((prev) => (prev.length < 4 ? [...prev, reader.result as string] : prev));
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
   };
 
   const toggleSymptom = (sym: string) => {
@@ -206,59 +318,34 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
 
   const handleSaveIllnessForm = (e: React.FormEvent) => {
     e.preventDefault();
-    const parsedT = parseFloat(tempStr);
-    const safeTemp = Number.isFinite(parsedT) ? parsedT : 37.0;
-    const isHighFever = safeTemp >= 38.5;
+    const resolvedDisease =
+      selectedDiseaseTag === '自定义'
+        ? customDiseaseName.trim() || '自定义生病记录'
+        : customDiseaseName.trim() || selectedDiseaseTag;
 
-    let record: IllnessRecord;
-    if (careCategory === 'medicine') {
-      record = {
-        id: `ill-${Date.now()}`,
-        date: illDate || getTodayDateStr(),
-        time: illTime || getCurrentTimeStr(),
-        careCategory: 'medicine',
-        title: medicineTitle.trim() || '退烧药',
-        summary: medicineDose.trim() || '1次',
-        handled: true,
-        temperatureC: safeTemp,
-        symptoms: selectedSymptoms.length > 0 ? selectedSymptoms : ['用药护理'],
-        medication:
-          medication.trim() ||
-          `${medicineTitle.trim() || '退烧药'} ${medicineDose.trim() || '1次'}，按医嘱记录观察`,
-        recorder,
-      };
-    } else if (careCategory === 'hydration') {
-      const ml = Math.max(10, Math.round(parseFloat(waterMlStr) || 120));
-      record = {
-        id: `ill-${Date.now()}`,
-        date: illDate || getTodayDateStr(),
-        time: illTime || getCurrentTimeStr(),
-        careCategory: 'hydration',
-        title: '多喝水',
-        summary: `${ml}ml`,
-        amountMl: ml,
-        handled: true,
-        temperatureC: 37.0,
-        symptoms: ['补水护理'],
-        medication: medication.trim() || `少量多次补充温开水 ${ml}ml`,
-        recorder,
-      };
-    } else {
-      record = {
-        id: `ill-${Date.now()}`,
-        date: illDate || getTodayDateStr(),
-        time: illTime || getCurrentTimeStr(),
-        careCategory: 'temperature',
-        title: isHighFever ? '体温过载' : '体温记录',
-        handled: false,
-        temperatureC: safeTemp,
-        symptoms: selectedSymptoms.length > 0 ? selectedSymptoms : ['观察中'],
-        medication: medication.trim() || (isHighFever ? '温水物理降温，密切监测体温变化' : '持续观察精神与饮水情况'),
-        recorder,
-      };
-    }
+    const trimmedTemp = tempStr.trim();
+    const parsedT = trimmedTemp ? parseFloat(trimmedTemp) : NaN;
+    const safeTemp = Number.isFinite(parsedT) ? parsedT : undefined;
+
+    const record: IllnessRecord = {
+      id: editingIllnessId || `ill-${Date.now()}`,
+      date: illDate || getTodayDateStr(),
+      time: illTime || getCurrentTimeStr(),
+      diseaseName: resolvedDisease,
+      diseaseTag: selectedDiseaseTag,
+      title: resolvedDisease,
+      handled: illHandled,
+      temperatureC: safeTemp,
+      symptoms: selectedSymptoms.length > 0 ? selectedSymptoms : [resolvedDisease],
+      medication: medication.trim() || '按医嘱居家观察与护理',
+      hospital: hospital.trim() || undefined,
+      diagnosis: diagnosis.trim() || undefined,
+      casePhotos: casePhotos.length > 0 ? casePhotos : undefined,
+      recorder,
+    };
 
     onAddIllness(record);
+    setExpandedIllnessId(record.id);
     onChangeMode('illness');
   };
 
@@ -281,10 +368,26 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
     return base.slice(start, Math.min(base.length, start + 4));
   }, [state.vaccines, vaccineFilter, showAllVaccines]);
 
-  // 5.3 过滤后的护理记录列表
+  // 5.3 过滤后的生病记录列表
   const filteredIllnesses = useMemo(() => {
     return state.illnesses.filter((rec) => {
-      if (careFilter !== 'all' && getRecordCategory(rec) !== careFilter) {
+      const label = getDiseaseLabel(rec);
+      if (illnessFilter === 'fever' && !isFeverLike(rec)) {
+        return false;
+      }
+      if (
+        illnessFilter === 'respiratory' &&
+        !(label.includes('感冒') || label.includes('咳') || rec.symptoms.includes('咳嗽') || rec.symptoms.includes('流鼻涕'))
+      ) {
+        return false;
+      }
+      if (
+        illnessFilter === 'skin_other' &&
+        (isFeverLike(rec) || label.includes('感冒') || label.includes('咳'))
+      ) {
+        return false;
+      }
+      if (illnessFilter === 'with_case' && !hasMedicalCase(rec)) {
         return false;
       }
       if (careDateFilter && rec.date !== careDateFilter) {
@@ -292,10 +395,10 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
       }
       return true;
     });
-  }, [state.illnesses, careFilter, careDateFilter]);
+  }, [state.illnesses, illnessFilter, careDateFilter]);
 
-  const parsedFormTemp = parseFloat(tempStr) || 0;
-  const isFormOverheat = careCategory === 'temperature' && parsedFormTemp >= 38.5;
+  const parsedFormTemp = tempStr.trim() ? parseFloat(tempStr) : NaN;
+  const isFormOverheat = Number.isFinite(parsedFormTemp) && parsedFormTemp >= 38.5;
 
   const handleBackClick = () => {
     if (mode === 'vaccine_sheet') {
@@ -308,7 +411,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
   };
 
   return (
-    <div className="relative flex min-h-full flex-col overflow-x-hidden pb-6">
+    <div className="relative flex min-h-full w-full min-w-0 max-w-full flex-col overflow-x-clip pb-6">
       {/* 顶部微星光晕染背景 */}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-56 opacity-45"
@@ -321,24 +424,24 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
         }}
       />
 
-      {/* 底部左右花草星球装饰边 */}
+      {/* 底部左右花草星球装饰边（限定在滚动页面底部，不覆盖固定底栏） */}
       <img
         src="/assets/extracted/health_footer_flowers.png"
         alt=""
         aria-hidden="true"
-        className="pointer-events-none fixed bottom-0 right-0 z-0 w-36 opacity-85 lg:absolute"
+        className="pointer-events-none absolute bottom-0 right-0 z-0 w-36 opacity-80"
       />
       <img
         src="/assets/extracted/health_footer_flowers.png"
         alt=""
         aria-hidden="true"
-        className="pointer-events-none fixed bottom-0 left-0 z-0 w-36 -scale-x-100 opacity-85 lg:absolute"
+        className="pointer-events-none absolute bottom-0 left-0 z-0 w-36 -scale-x-100 opacity-80"
       />
 
       {/* =================================================================
           顶部统一导航栏：返回 | 治愈工坊 ✦ | 日历筛选/时间
          ================================================================= */}
-      <header className="relative z-20 flex h-[54px] items-center justify-between px-3.5 pt-1">
+      <header className="relative z-20 flex min-h-[54px] items-center justify-between px-4 pt-safe pb-1">
         <button
           type="button"
           onClick={handleBackClick}
@@ -403,7 +506,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
 
       {/* 顶部日历展开面板（5.1 疫苗进度筛选 / 5.3 护理按日筛选） */}
       {showHeaderPanel && mode === 'vaccine' && (
-        <div className="relative z-20 mx-3.5 mb-2 rounded-2xl border border-white/15 bg-[#122350]/85 px-3 py-2.5 backdrop-blur-md">
+        <div className="relative z-20 mx-4 mb-2.5 rounded-[22px] border border-white/15 bg-[#122350]/88 px-3.5 py-3 shadow-[0_10px_24px_rgba(3,8,24,0.42)] backdrop-blur-md">
           <div className="flex items-center justify-between text-[11.5px]">
             <span className="font-semibold text-amber-100">防御护盾进度</span>
             <span className="font-typewriter font-bold text-amber-300 tabular-nums">
@@ -445,7 +548,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
       )}
 
       {showHeaderPanel && mode === 'illness' && (
-        <div className="relative z-20 mx-3.5 mb-2 flex items-center justify-between gap-2 rounded-2xl border border-white/15 bg-[#122350]/85 px-3 py-2 backdrop-blur-md">
+        <div className="relative z-20 mx-4 mb-2.5 flex items-center justify-between gap-2 rounded-[22px] border border-white/15 bg-[#122350]/88 px-3.5 py-2.5 shadow-[0_10px_24px_rgba(3,8,24,0.42)] backdrop-blur-md">
           <span className="text-[11.5px] font-medium text-indigo-100">按日期查看</span>
           <div className="flex items-center gap-2">
             <input
@@ -471,7 +574,11 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
           5.1 疫苗护盾列表页（1:1 还原图二左上 + 完整 19 剂交互优化）
          ================================================================= */}
       {mode === 'vaccine' && (
-        <div className="relative z-10 flex flex-1 flex-col px-3.5">
+        <div
+          style={{ minHeight: 'calc(var(--app-viewport-h) - 54px - var(--safe-top))' }}
+          className="relative z-10 flex w-full min-w-0 max-w-full flex-1 flex-col justify-between px-4"
+        >
+          <div>
           {/* 顶部二级模式切换胶囊：疫苗护盾 | 生病护理 */}
           <div className="mb-1 flex justify-center">
             <div className="inline-flex items-center rounded-full border border-white/15 bg-[#152550]/75 p-0.5 backdrop-blur-md shadow-[0_4px_14px_rgba(3,8,24,0.38)]">
@@ -487,7 +594,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                 onClick={() => onChangeMode('illness')}
                 className="rounded-full px-4 py-1 text-[12px] font-medium text-indigo-100/80 transition-colors hover:text-white"
               >
-                生病护理
+                生病记录
               </button>
             </div>
           </div>
@@ -533,7 +640,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
           </div>
 
           {/* 撕纸疫苗时间轴主卡片 */}
-          <div className="diary-paper-card relative z-20 px-1.5 py-2">
+          <div className="diary-paper-card relative z-20 min-w-0 px-1.5 py-2">
             <div className="relative space-y-1">
               {filteredVaccines.map((dose, idx) => {
                 const isActivated = dose.status === 'activated';
@@ -659,6 +766,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
             )}
           </div>
 
+          </div>
+
           {/* 底部主按钮：暖金色「疫苗打卡」 */}
           <div className="relative z-10 mt-4 flex justify-center pb-2">
             <button
@@ -684,7 +793,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
       {mode === 'vaccine_sheet' && (
         <form
           onSubmit={handleSaveVaccineForm}
-          className="relative z-10 flex flex-1 flex-col px-3.5 pb-4"
+          className="relative z-10 flex w-full min-w-0 max-w-full flex-1 flex-col px-4 pb-safe"
         >
           {/* 顶部英雄插画（置于撕纸卡片后方，自然探出顶边） */}
           <div className="relative z-10 -mb-5 flex items-end justify-between px-1 pt-0.5">
@@ -964,13 +1073,17 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
       )}
 
       {/* =================================================================
-          5.3 生病护理列表页（1:1 还原图二左下 + 熟睡宝宝与橘猫大图）
+          5.3 生病记录与病历列表页（插画置于白色撕纸卡片后方）
          ================================================================= */}
       {mode === 'illness' && (
-        <div className="relative z-10 flex flex-1 flex-col px-3.5">
-          {/* 顶部暖心文案 + 右侧双态切换胶囊（贴合设计图二左下构图） */}
-          <div className="mb-1 flex items-start justify-between gap-2 px-1 pt-1">
-            <p className="text-[12.5px] font-medium leading-[1.45] text-[#fff8e7]/95 drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]">
+        <div
+          style={{ minHeight: 'calc(var(--app-viewport-h) - 54px - var(--safe-top))' }}
+          className="relative z-10 flex w-full min-w-0 max-w-full flex-1 flex-col justify-between px-4"
+        >
+          <div>
+          {/* 顶部暖心文案 + 右侧双态切换胶囊 */}
+          <div className="mb-1 flex min-w-0 items-start justify-between gap-2 px-0.5 pt-1">
+            <p className="min-w-0 text-[12px] font-medium leading-[1.45] text-[#fff8e7]/95 drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]">
               照顾生病的小宝贝，
               <br />
               也要记得好好休息呀～
@@ -980,14 +1093,14 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               <button
                 type="button"
                 onClick={() => onChangeMode('illness')}
-                className="rounded-full bg-gradient-to-b from-[#ffe25f] via-[#facc34] to-[#f2ab1a] px-3 py-1 text-[11.5px] font-bold text-[#1f190d] shadow-[0_2px_8px_rgba(250,204,52,0.4)]"
+                className="rounded-full bg-gradient-to-b from-[#ffe25f] via-[#facc34] to-[#f2ab1a] px-2.5 py-1 text-[11.5px] font-bold text-[#1f190d] shadow-[0_2px_8px_rgba(250,204,52,0.4)]"
               >
-                生病护理
+                生病记录
               </button>
               <button
                 type="button"
                 onClick={() => onChangeMode('vaccine')}
-                className="rounded-full px-3 py-1 text-[11.5px] font-medium text-indigo-100/80 transition-colors hover:text-white"
+                className="rounded-full px-2.5 py-1 text-[11.5px] font-medium text-indigo-100/80 transition-colors hover:text-white"
               >
                 疫苗护盾
               </button>
@@ -1001,30 +1114,31 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                 src="/assets/extracted/health_sleeping_baby_cat.png"
                 alt="被窝里熟睡的小宝贝与橘猫"
                 referrerPolicy="no-referrer"
-                className="h-[160px] w-auto object-contain drop-shadow-[0_8px_18px_rgba(3,8,24,0.45)]"
+                className="h-[156px] w-auto max-w-full object-contain drop-shadow-[0_8px_18px_rgba(3,8,24,0.45)]"
               />
             </AssetSlot>
           </div>
 
-          {/* 撕纸护理记录卡片 */}
-          <div className="diary-paper-card relative z-20 px-2 pb-2.5 pt-2.5">
-            {/* 轻量分类筛选行 */}
-            <div className="mb-2.5 flex items-center justify-between gap-1 px-0.5">
-              <div className="flex items-center gap-1">
+          {/* 撕纸生病记录与病历主卡片 */}
+          <div className="diary-paper-card relative z-20 min-w-0 px-1.5 pb-2.5 pt-2">
+            {/* 疾病分类与病历筛选行 */}
+            <div className="mb-2.5 flex min-w-0 items-center justify-between gap-1.5 px-0.5">
+              <div className="no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
                 {(
                   [
                     { id: 'all', label: '全部' },
-                    { id: 'temperature', label: '体温' },
-                    { id: 'medicine', label: '用药' },
-                    { id: 'hydration', label: '补水' },
+                    { id: 'fever', label: '发烧' },
+                    { id: 'respiratory', label: '感冒' },
+                    { id: 'skin_other', label: '皮疹' },
+                    { id: 'with_case', label: '病历' },
                   ] as const
                 ).map((chip) => (
                   <button
                     key={chip.id}
                     type="button"
-                    onClick={() => setCareFilter(chip.id)}
-                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-colors ${
-                      careFilter === chip.id
+                    onClick={() => setIllnessFilter(chip.id)}
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-colors ${
+                      illnessFilter === chip.id
                         ? 'bg-[#21345e] text-amber-100'
                         : 'bg-[#eee4d1] text-[#6d6153] hover:bg-[#e5d8c0]'
                     }`}
@@ -1033,53 +1147,45 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                   </button>
                 ))}
               </div>
-              <span className="font-typewriter text-[11px] font-semibold text-[#8c7f6f] tabular-nums">
+              <span className="shrink-0 font-typewriter text-[11px] font-semibold text-[#8c7f6f] tabular-nums">
                 {filteredIllnesses.length} 条
               </span>
             </div>
 
             {filteredIllnesses.length === 0 ? (
-              <div className="rounded-2xl bg-[#f7f0e2] px-4 py-8 text-center">
+              <div className="rounded-[20px] bg-[#f7f0e2] px-4 py-8 text-center">
                 <div className="font-display text-2xl text-[#24324e]">星球运行平稳</div>
                 <p className="mt-1 text-[12px] text-[#786b5c]">
-                  暂无对应的护理记录，点击下方按钮随时记录宝宝状态
+                  暂无对应的生病与病历记录，点击下方按钮随时记录
                 </p>
               </div>
             ) : (
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {filteredIllnesses.map((rec) => {
-                  const category = getRecordCategory(rec);
-                  const isOverheat = category === 'temperature' && rec.temperatureC >= 38.5;
+                  const diseaseLabel = getDiseaseLabel(rec);
+                  const isOverheat =
+                    typeof rec.temperatureC === 'number' && rec.temperatureC >= 38.5;
                   const isExpanded = expandedIllnessId === rec.id;
+                  const withCase = hasMedicalCase(rec);
+                  const iconSrc = getDiseaseIconSrc(rec);
 
-                  const iconSrc =
-                    category === 'medicine'
-                      ? '/assets/extracted/health_medicine_bottle.png'
-                      : category === 'hydration'
-                      ? '/assets/extracted/health_water_drop.png'
-                      : '/assets/extracted/health_thermometer.png';
-
-                  const cardTitle =
-                    rec.title ||
-                    (isOverheat
-                      ? '体温过载'
-                      : category === 'medicine'
-                      ? '退烧药'
-                      : category === 'hydration'
-                      ? '多喝水'
-                      : '体温记录');
-
-                  const subtitleLeft =
-                    category === 'temperature'
-                      ? `${rec.temperatureC.toFixed(1)}°C`
-                      : rec.summary || (rec.amountMl ? `${rec.amountMl}ml` : '护理记录');
+                  const timeText = `${rec.date.replace(/-/g, '.')} ${rec.time}`;
+                  const metaLine =
+                    typeof rec.temperatureC === 'number'
+                      ? `${rec.temperatureC.toFixed(1)}°C · ${timeText}`
+                      : timeText;
+                  const shortHospital = rec.hospital
+                    ? rec.hospital.split('·')[0].trim()
+                    : '';
 
                   return (
                     <div
                       key={rec.id}
-                      className={`overflow-hidden rounded-2xl border transition-all ${
-                        isOverheat
+                      className={`min-w-0 overflow-hidden rounded-[20px] border shadow-[0_4px_12px_rgba(68,52,28,0.06)] transition-all ${
+                        isOverheat && !rec.handled
                           ? 'border-[#ebb5a8] bg-gradient-to-r from-[#f8d0c8] to-[#fbe4de]'
+                          : isOverheat
+                          ? 'border-[#eec3b8] bg-[#fcf0ec]'
                           : 'border-[#e6dac3] bg-[#faf4e8]/95'
                       }`}
                     >
@@ -1095,59 +1201,78 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                             setExpandedIllnessId((prev) => (prev === rec.id ? null : rec.id));
                           }
                         }}
-                        className="flex w-full cursor-pointer items-center justify-between gap-2.5 px-3 py-3 text-left"
+                        className="flex w-full min-w-0 cursor-pointer items-center justify-between gap-2 px-2.5 py-2.5 text-left"
                       >
-                        <div className="flex min-w-0 items-center gap-2.5">
+                        <div className="flex min-w-0 flex-1 items-center gap-2">
                           <img
                             src={iconSrc}
                             alt=""
                             referrerPolicy="no-referrer"
-                            className="h-9 w-8 shrink-0 object-contain drop-shadow-xs"
+                            className="h-8 w-8 shrink-0 object-contain drop-shadow-xs"
                           />
-                          <div className="min-w-0">
-                            <div
-                              className={`truncate text-[14.5px] font-extrabold ${
-                                isOverheat ? 'text-[#c93524]' : 'text-[#1c2b48]'
-                              }`}
-                            >
-                              {cardTitle}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1">
+                              <span
+                                className={`truncate text-[14px] font-extrabold ${
+                                  isOverheat ? 'text-[#c93524]' : 'text-[#1c2b48]'
+                                }`}
+                              >
+                                {diseaseLabel}
+                              </span>
+                              {isOverheat && (
+                                <span className="shrink-0 rounded-full bg-[#e05240]/15 px-1.5 py-0.5 text-[10px] font-extrabold text-[#c93524]">
+                                  体温过载
+                                </span>
+                              )}
+                              {withCase && (
+                                <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[#dde8fb] px-1.5 py-0.5 text-[10px] font-bold text-[#2b5298]">
+                                  <FileText className="h-2.5 w-2.5" />
+                                  <span>病历</span>
+                                </span>
+                              )}
                             </div>
-                            <div className="mt-0.5 truncate text-[11.5px] font-medium text-[#6f6357] tabular-nums">
-                              {subtitleLeft} · {rec.date.replace(/-/g, '.')} {rec.time}
+                            <div className="mt-0.5 truncate text-[11px] font-medium text-[#6f6357] tabular-nums">
+                              {metaLine}
                             </div>
+                            {shortHospital && (
+                              <div className="mt-0.5 truncate text-[10.5px] font-medium text-[#4a6594]">
+                                就诊：{shortHospital}
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        {isOverheat ? (
+                        <div className="flex shrink-0 items-center gap-1">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               onToggleIllnessHandled(rec.id);
                             }}
-                            className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold transition-transform active:scale-95 ${
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition-transform active:scale-95 ${
                               rec.handled
-                                ? 'bg-[#efb6ac]/85 text-[#9c2f22]'
-                                : 'bg-[#d94330] text-white shadow-xs'
+                                ? 'bg-[#d8edc9] text-[#3b7a24]'
+                                : isOverheat
+                                ? 'bg-[#d94330] text-white shadow-xs'
+                                : 'bg-[#f6deb0] text-[#8a5514]'
                             }`}
                           >
-                            {rec.handled ? '已处理' : '待处理'}
+                            {rec.handled ? '已康复' : '观察中'}
                           </button>
-                        ) : (
                           <ChevronRight
-                            className={`h-4.5 w-4.5 shrink-0 text-[#8a7d6d] transition-transform ${
+                            className={`h-4 w-4 text-[#8a7d6d] transition-transform ${
                               isExpanded ? 'rotate-90' : ''
                             }`}
                           />
-                        )}
+                        </div>
                       </div>
 
-                      {/* 点击卡片展开详细护理说明与删除操作 */}
+                      {/* 点击展开：症状、用药、完整病历档案与照片 */}
                       {isExpanded && (
-                        <div className="border-t border-black/5 bg-white/45 px-3.5 py-2.5 text-[12px] text-[#453c33]">
+                        <div className="space-y-2.5 border-t border-black/5 bg-white/55 px-3.5 py-3 text-[12px] text-[#453c33]">
                           {rec.symptoms.length > 0 && (
-                            <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                              <span className="text-[11px] font-semibold text-[#7b6e60]">标签：</span>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-[11px] font-semibold text-[#7b6e60]">症状：</span>
                               {rec.symptoms.map((sym) => (
                                 <span
                                   key={sym}
@@ -1158,17 +1283,79 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                               ))}
                             </div>
                           )}
-                          <p className="leading-relaxed text-[#2d2620]">{rec.medication}</p>
-                          <div className="mt-2 flex items-center justify-between text-[11px] text-[#837668]">
+
+                          {rec.medication && (
+                            <div className="rounded-xl bg-[#f7efe0] px-2.5 py-2 leading-relaxed text-[#2d2620]">
+                              <span className="font-bold text-[#5a4c3e]">用药与护理：</span>
+                              {rec.medication}
+                            </div>
+                          )}
+
+                          {/* 病历档案区块 */}
+                          {withCase && (
+                            <div className="rounded-xl border border-[#d6e0f2] bg-[#f1f6ff]/90 p-2.5 space-y-1.5">
+                              <div className="flex items-center gap-1.5 text-[11.5px] font-extrabold text-[#23437a]">
+                                <FileText className="h-3.5 w-3.5" />
+                                <span>就诊病历档案</span>
+                              </div>
+                              {rec.hospital && (
+                                <div className="text-[11.5px] text-[#334669]">
+                                  <span className="font-semibold">就诊医院：</span>
+                                  {rec.hospital}
+                                </div>
+                              )}
+                              {rec.diagnosis && (
+                                <div className="text-[11.5px] leading-relaxed text-[#2c3c5a]">
+                                  <span className="font-semibold">医生诊断：</span>
+                                  {rec.diagnosis}
+                                </div>
+                              )}
+                              {rec.casePhotos && rec.casePhotos.length > 0 && (
+                                <div className="pt-1">
+                                  <div className="mb-1 text-[10.5px] font-semibold text-[#54688c]">
+                                    病历 / 化验单照片（点击查看大图）
+                                  </div>
+                                  <div className="grid grid-cols-4 gap-1.5">
+                                    {rec.casePhotos.map((src, idx) => (
+                                      <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={() => setLightboxPhoto(src)}
+                                        className="aspect-square overflow-hidden rounded-lg border border-[#c8d6ee] bg-white shadow-xs transition-transform active:scale-95"
+                                      >
+                                        <img
+                                          src={src}
+                                          alt={`病历照片 ${idx + 1}`}
+                                          className="h-full w-full object-cover"
+                                        />
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between pt-0.5 text-[11px] text-[#837668]">
                             <span>记录人：{rec.recorder}</span>
-                            <button
-                              type="button"
-                              onClick={() => onDeleteIllness(rec.id)}
-                              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-rose-600 hover:bg-rose-50"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              <span>删除</span>
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openEditIllnessForm(rec)}
+                                className="inline-flex items-center gap-1 rounded-lg bg-[#efe3cb] px-2.5 py-1 font-bold text-[#2b3f6b] hover:bg-[#e5d5b6]"
+                              >
+                                <Pencil className="h-3 w-3" />
+                                <span>{withCase ? '编辑病历' : '补充病历'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onDeleteIllness(rec.id)}
+                                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-rose-600 hover:bg-rose-50"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                <span>删除</span>
+                              </button>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -1179,27 +1366,29 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
             )}
           </div>
 
-          {/* 底部暖金色主按钮：+ 新建护理记录 */}
+          </div>
+
+          {/* 底部暖金色主按钮：+ 新建生病记录 */}
           <div className="relative z-10 mt-4 flex justify-center pb-2">
             <button
               type="button"
-              onClick={() => openIllnessForm('temperature')}
+              onClick={() => openCreateIllnessForm('发烧')}
               className="flex min-h-[48px] w-[78%] items-center justify-center gap-1.5 rounded-full border-2 border-[#fff0a6]/85 bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] px-6 text-[15px] font-bold tracking-wide text-[#241b09] shadow-[0_8px_22px_rgba(244,179,30,0.45),inset_0_2px_2px_rgba(255,255,255,0.65)] transition-transform hover:brightness-105 active:scale-[0.97]"
             >
               <Plus className="h-4.5 w-4.5 stroke-[2.8]" />
-              <span>新建护理记录</span>
+              <span>新建生病记录</span>
             </button>
           </div>
         </div>
       )}
 
       {/* =================================================================
-          5.4 新建护理记录页（1:1 还原图三右 + 支持体温/用药/补水三类记录）
+          5.4 新建 / 编辑生病记录与病历录入页（插画置于撕纸卡片后方）
          ================================================================= */}
       {mode === 'illness_form' && (
         <form
           onSubmit={handleSaveIllnessForm}
-          className="relative z-10 flex flex-1 flex-col px-3.5 pb-4"
+          className="relative z-10 flex w-full min-w-0 max-w-full flex-1 flex-col px-4 pb-safe"
         >
           {/* 顶部英雄区：医药箱标语 + 持盾小男孩与巴哥犬（置于撕纸卡片后方） */}
           <div className="relative z-10 -mb-5 flex items-end justify-between px-1 pt-0.5">
@@ -1236,7 +1425,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
             />
           </div>
 
-          {/* 撕纸新建护理表单卡片 + 右上角双闪星 */}
+          {/* 撕纸新建生病记录与病历表单卡片 + 右上角双闪星 */}
           <div className="diary-paper-card relative z-20 px-2.5 py-3">
             <img
               src="/assets/extracted/health_star_big.png"
@@ -1252,52 +1441,30 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
             />
 
             {/* 卡片标题头 */}
-            <div className="flex items-center justify-between gap-2 pb-3">
-              <div className="flex items-center gap-2.5">
-                <img
-                  src={
-                    careCategory === 'medicine'
-                      ? '/assets/extracted/health_medicine_bottle.png'
-                      : careCategory === 'hydration'
-                      ? '/assets/extracted/health_water_drop.png'
-                      : '/assets/extracted/health_thermometer.png'
-                  }
-                  alt=""
-                  aria-hidden="true"
-                  className="h-10 w-9 shrink-0 object-contain"
-                />
-                <div>
-                  <h2 className="text-[16px] font-extrabold text-[#182746]">新建护理记录</h2>
-                  <p className="text-[11.5px] text-[#7c7163]">记录宝宝的身体状况吧~</p>
-                </div>
+            <div className="flex items-center gap-2.5 pb-3">
+              <img
+                src={
+                  selectedDiseaseTag === '发烧' || selectedDiseaseTag === '体温异常'
+                    ? '/assets/extracted/health_thermometer.png'
+                    : selectedDiseaseTag === '感冒' ||
+                      selectedDiseaseTag === '咳嗽' ||
+                      selectedDiseaseTag === '腹泻'
+                    ? '/assets/extracted/health_medicine_bottle.png'
+                    : '/assets/extracted/health_firstaid_kit.png'
+                }
+                alt=""
+                aria-hidden="true"
+                className="h-10 w-9 shrink-0 object-contain"
+              />
+              <div>
+                <h2 className="text-[16px] font-extrabold text-[#182746]">
+                  {editingIllnessId ? '编辑生病记录与病历' : '新建生病记录'}
+                </h2>
+                <p className="text-[11.5px] text-[#7c7163]">记录疾病情况、用药与就诊病历~</p>
               </div>
             </div>
 
-            {/* 护理类型三选一优化条（默认“体温护理”与图三右一致，并可一键记用药或补水） */}
-            <div className="mb-3.5 grid grid-cols-3 gap-1.5 rounded-full bg-[#efe4ce] p-1">
-              {(
-                [
-                  { id: 'temperature', label: '体温护理' },
-                  { id: 'medicine', label: '用药记录' },
-                  { id: 'hydration', label: '多喝水' },
-                ] as const
-              ).map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setCareCategory(tab.id)}
-                  className={`rounded-full py-1.5 text-[12px] font-bold transition-all ${
-                    careCategory === tab.id
-                      ? 'bg-gradient-to-b from-[#ffe469] to-[#f8c437] text-[#241b09] shadow-xs'
-                      : 'text-[#6c6052] hover:text-[#2a231c]'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {/* 可折叠时间选择行（点击右上日历图标可微调日期与时刻） */}
+            {/* 可折叠时间选择行（点击右上日历图标或底部时间戳微调） */}
             {showFormTimeRow && (
               <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-[#e3d5be] bg-[#faf4e8] p-2">
                 <label className="block">
@@ -1321,187 +1488,152 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               </div>
             )}
 
-            <div className="space-y-4">
-              {/* 模式 A：体温护理（1:1 图三右布局） */}
-              {careCategory === 'temperature' && (
-                <>
-                  <div>
-                    <div className="flex items-center justify-between gap-2.5">
-                      <div className="flex shrink-0 items-center gap-1.5 text-[13px] font-bold text-[#25324e]">
-                        <img
-                          src="/assets/extracted/health_thermometer.png"
-                          alt=""
-                          aria-hidden="true"
-                          className="h-5 w-4 object-contain"
-                        />
-                        <span>体温</span>
-                      </div>
-
-                      <div
-                        className={`flex flex-1 overflow-hidden rounded-2xl border transition-all ${
-                          isFormOverheat
-                            ? 'border-[#e68475] bg-[#fdf2ef] ring-2 ring-[#f6cbc2]'
-                            : 'border-[#e3d5be] bg-[#f8f1e4]'
-                        }`}
-                      >
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="34"
-                          max="43"
-                          value={tempStr}
-                          onChange={(e) => setTempStr(e.target.value)}
-                          className="w-full bg-transparent px-3.5 py-2.5 font-typewriter text-[19px] font-bold text-[#1e2c49] focus:outline-none tabular-nums"
-                          required
-                        />
-                        <span className="flex items-center border-l border-[#e3d5be] bg-[#efe5d2]/75 px-3.5 text-[13.5px] font-bold text-[#4e463d]">
-                          °C
-                        </span>
-                      </div>
-                    </div>
-
-                    {isFormOverheat && (
-                      <div className="mt-1.5 flex items-center justify-end gap-1 text-[11px] font-bold text-[#c93524]">
-                        <span>⚠ 体温过载预警（≥38.5°C），建议及时降温并密切观察</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 症状多选胶囊 */}
-                  <div>
-                    <div className="mb-2 flex items-center gap-1.5 text-[13px] font-bold text-[#25324e]">
-                      <img
-                        src="/assets/extracted/health_star_small.png"
-                        alt=""
-                        aria-hidden="true"
-                        className="h-4 w-4 object-contain"
-                      />
-                      <span>症状</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {SYMPTOM_OPTIONS.map((sym) => {
-                        const active = selectedSymptoms.includes(sym);
-                        return (
-                          <button
-                            key={sym}
-                            type="button"
-                            onClick={() => toggleSymptom(sym)}
-                            className={`min-h-[34px] rounded-full px-3.5 text-[12.5px] font-bold transition-all active:scale-95 ${
-                              active
-                                ? 'border border-[#f2c144] bg-gradient-to-b from-[#ffe469] to-[#f8c437] text-[#261c07] shadow-[0_3px_8px_rgba(248,196,55,0.35)]'
-                                : 'border border-[#e4d7c1] bg-[#f7f1e5] text-[#4e453b] hover:bg-[#f0e5d1]'
-                            }`}
-                          >
-                            {sym}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* 模式 B：用药记录快捷录入 */}
-              {careCategory === 'medicine' && (
-                <>
-                  <div>
-                    <div className="mb-1.5 flex items-center gap-1.5 text-[13px] font-bold text-[#25324e]">
-                      <img
-                        src="/assets/extracted/health_icon_capsule.png"
-                        alt=""
-                        aria-hidden="true"
-                        className="h-4 w-4 object-contain"
-                      />
-                      <span>药物或护理名称</span>
-                    </div>
-                    <input
-                      type="text"
-                      value={medicineTitle}
-                      onChange={(e) => setMedicineTitle(e.target.value)}
-                      placeholder="例如：退烧药、布洛芬"
-                      className="w-full rounded-2xl border border-[#e3d5be] bg-[#f8f1e4] px-3.5 py-2.5 text-[13.5px] font-bold text-[#1e2c49] focus:border-[#f0bd3f] focus:outline-none"
-                      required
+            <div className="space-y-3.5">
+              {/* 1. 疾病类型（常见预设 + 自定义疾病名称输入） */}
+              <div>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-[13px] font-bold text-[#25324e]">
+                    <img
+                      src="/assets/extracted/health_star_small.png"
+                      alt=""
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 object-contain"
                     />
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {MEDICINE_PRESETS.map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => setMedicineTitle(preset)}
-                          className={`rounded-full px-3 py-1 text-[11.5px] font-bold ${
-                            medicineTitle === preset
-                              ? 'bg-gradient-to-b from-[#ffe469] to-[#f8c437] text-[#261c07]'
-                              : 'border border-[#e4d7c1] bg-[#f7f1e5] text-[#5a5045]'
-                          }`}
-                        >
-                          {preset}
-                        </button>
-                      ))}
-                    </div>
+                    <span>生病类型</span>
                   </div>
-
-                  <div className="flex items-center gap-2.5">
-                    <span className="shrink-0 text-[13px] font-bold text-[#25324e]">服用剂量</span>
-                    <input
-                      type="text"
-                      value={medicineDose}
-                      onChange={(e) => setMedicineDose(e.target.value)}
-                      placeholder="例如：1次 / 2.5ml"
-                      className="flex-1 rounded-2xl border border-[#e3d5be] bg-[#f8f1e4] px-3 py-2 text-[13.5px] font-bold text-[#1e2c49] focus:outline-none"
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* 模式 C：多喝水补水记录 */}
-              {careCategory === 'hydration' && (
-                <div>
-                  <div className="flex items-center justify-between gap-2.5">
-                    <div className="flex shrink-0 items-center gap-1.5 text-[13px] font-bold text-[#25324e]">
-                      <img
-                        src="/assets/extracted/health_water_drop.png"
-                        alt=""
-                        aria-hidden="true"
-                        className="h-5 w-4 object-contain"
-                      />
-                      <span>补水量</span>
-                    </div>
-                    <div className="flex flex-1 overflow-hidden rounded-2xl border border-[#e3d5be] bg-[#f8f1e4]">
-                      <input
-                        type="number"
-                        min="10"
-                        max="1000"
-                        value={waterMlStr}
-                        onChange={(e) => setWaterMlStr(e.target.value)}
-                        className="w-full bg-transparent px-3.5 py-2.5 font-typewriter text-[19px] font-bold text-[#1e2c49] focus:outline-none tabular-nums"
-                        required
-                      />
-                      <span className="flex items-center border-l border-[#e3d5be] bg-[#efe5d2]/75 px-3.5 text-[13.5px] font-bold text-[#4e463d]">
-                        ml
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="mt-2.5 flex flex-wrap gap-2">
-                    {WATER_PRESETS.map((ml) => (
-                      <button
-                        key={ml}
-                        type="button"
-                        onClick={() => setWaterMlStr(String(ml))}
-                        className={`rounded-full px-3.5 py-1 text-[12px] font-bold tabular-nums ${
-                          waterMlStr === String(ml)
-                            ? 'bg-gradient-to-b from-[#ffe469] to-[#f8c437] text-[#261c07]'
-                            : 'border border-[#e4d7c1] bg-[#f7f1e5] text-[#5a5045]'
-                        }`}
-                      >
-                        {ml}ml
-                      </button>
-                    ))}
+                  <div className="inline-flex rounded-full bg-[#efe4ce] p-0.5 text-[10.5px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setIllHandled(false)}
+                      className={`rounded-full px-2 py-0.5 ${
+                        !illHandled ? 'bg-[#d94330] text-white' : 'text-[#6c6052]'
+                      }`}
+                    >
+                      观察中
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIllHandled(true)}
+                      className={`rounded-full px-2 py-0.5 ${
+                        illHandled ? 'bg-[#4f9438] text-white' : 'text-[#6c6052]'
+                      }`}
+                    >
+                      已康复
+                    </button>
                   </div>
                 </div>
-              )}
 
-              {/* 用药记录 / 护理备注（始终显示，贴合图三右） */}
+                <div className="flex flex-wrap gap-1.5">
+                  {DISEASE_PRESETS.map((preset) => {
+                    const active = selectedDiseaseTag === preset;
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => handleSelectDiseasePreset(preset)}
+                        className={`min-h-[33px] rounded-full px-3 text-[12px] font-bold transition-all active:scale-95 ${
+                          active
+                            ? 'border border-[#f2c144] bg-gradient-to-b from-[#ffe469] to-[#f8c437] text-[#261c07] shadow-[0_3px_8px_rgba(248,196,55,0.35)]'
+                            : 'border border-[#e4d7c1] bg-[#f7f1e5] text-[#4e453b] hover:bg-[#f0e5d1]'
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* 自定义疾病输入框（选“自定义”必填，其他类型也可补充具体病名如“幼儿急疹”） */}
+                <input
+                  type="text"
+                  value={customDiseaseName}
+                  onChange={(e) => setCustomDiseaseName(e.target.value)}
+                  placeholder={
+                    selectedDiseaseTag === '自定义'
+                      ? '请输入具体疾病名称（如：幼儿急疹、中耳炎、鹅口疮…）'
+                      : `补充或自定义具体名称（留空则记为“${selectedDiseaseTag}”）`
+                  }
+                  required={selectedDiseaseTag === '自定义'}
+                  className="mt-2 w-full rounded-2xl border border-[#e3d5be] bg-[#f8f1e4] px-3 py-2 text-[12.5px] font-semibold text-[#1e2c49] placeholder:font-normal placeholder:text-[#a69a8a] focus:border-[#f0bd3f] focus:outline-none"
+                />
+              </div>
+
+              {/* 2. 实测体温（选填，≥38.5°C 触发体温过载提示） */}
+              <div>
+                <div className="flex items-center justify-between gap-2.5">
+                  <div className="flex shrink-0 items-center gap-1.5 text-[13px] font-bold text-[#25324e]">
+                    <img
+                      src="/assets/extracted/health_thermometer.png"
+                      alt=""
+                      aria-hidden="true"
+                      className="h-5 w-4 object-contain"
+                    />
+                    <span>体温（选填）</span>
+                  </div>
+
+                  <div
+                    className={`flex flex-1 overflow-hidden rounded-2xl border transition-all ${
+                      isFormOverheat
+                        ? 'border-[#e68475] bg-[#fdf2ef] ring-2 ring-[#f6cbc2]'
+                        : 'border-[#e3d5be] bg-[#f8f1e4]'
+                    }`}
+                  >
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="34"
+                      max="43"
+                      value={tempStr}
+                      onChange={(e) => setTempStr(e.target.value)}
+                      placeholder="未测量可留空"
+                      className="w-full bg-transparent px-3 py-2 font-typewriter text-[17px] font-bold text-[#1e2c49] placeholder:font-sans placeholder:text-[12px] placeholder:font-normal placeholder:text-[#a69a8a] focus:outline-none tabular-nums"
+                    />
+                    <span className="flex items-center border-l border-[#e3d5be] bg-[#efe5d2]/75 px-3 text-[13px] font-bold text-[#4e463d]">
+                      °C
+                    </span>
+                  </div>
+                </div>
+
+                {isFormOverheat && (
+                  <div className="mt-1 flex items-center justify-end text-[11px] font-bold text-[#c93524]">
+                    ⚠ 体温过载预警（≥38.5°C），建议及时降温并密切观察
+                  </div>
+                )}
+              </div>
+
+              {/* 3. 伴随症状多选胶囊 */}
+              <div>
+                <div className="mb-1.5 flex items-center gap-1.5 text-[13px] font-bold text-[#25324e]">
+                  <img
+                    src="/assets/extracted/health_star_small.png"
+                    alt=""
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5 object-contain"
+                  />
+                  <span>伴随症状</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {SYMPTOM_OPTIONS.map((sym) => {
+                    const active = selectedSymptoms.includes(sym);
+                    return (
+                      <button
+                        key={sym}
+                        type="button"
+                        onClick={() => toggleSymptom(sym)}
+                        className={`min-h-[32px] rounded-full px-3 text-[12px] font-bold transition-all active:scale-95 ${
+                          active
+                            ? 'border border-[#f2c144] bg-gradient-to-b from-[#ffe469] to-[#f8c437] text-[#261c07] shadow-[0_2px_6px_rgba(248,196,55,0.35)]'
+                            : 'border border-[#e4d7c1] bg-[#f7f1e5] text-[#4e453b] hover:bg-[#f0e5d1]'
+                        }`}
+                      >
+                        {sym}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 4. 用药记录 */}
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-[13px] font-bold text-[#25324e]">
@@ -1511,7 +1643,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                       aria-hidden="true"
                       className="h-4 w-4 object-contain"
                     />
-                    <span>{careCategory === 'hydration' ? '补水备注（可选）' : '用药记录'}</span>
+                    <span>用药与护理</span>
                   </div>
                   <select
                     aria-label="选择记录人"
@@ -1528,23 +1660,111 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                 </div>
 
                 <textarea
-                  rows={3}
-                  maxLength={100}
+                  rows={2}
+                  maxLength={150}
                   value={medication}
                   onChange={(e) => setMedication(e.target.value)}
-                  placeholder="请输入用药名称、剂量等信息..."
-                  className="w-full resize-none rounded-2xl border border-[#e3d5be] bg-[#f8f1e4] px-3 py-2.5 text-[13px] leading-relaxed text-[#242f46] placeholder:text-[#a69a8a] focus:border-[#f0bd3f] focus:outline-none"
+                  placeholder="请输入用药名称、剂量或物理降温等护理方式..."
+                  className="w-full resize-none rounded-2xl border border-[#e3d5be] bg-[#f8f1e4] px-3 py-2 text-[12.5px] leading-relaxed text-[#242f46] placeholder:text-[#a69a8a] focus:border-[#f0bd3f] focus:outline-none"
                 />
-                <div className="mt-1 flex items-center justify-between text-[11px] text-[#9b8f7f]">
-                  <button
-                    type="button"
-                    onClick={() => setShowFormTimeRow((v) => !v)}
-                    className="font-typewriter text-[#7b6e60] underline decoration-dotted underline-offset-2"
-                  >
-                    {illDate.replace(/-/g, '.')} {illTime}
-                  </button>
-                  <span className="font-typewriter tabular-nums">{medication.length}/100</span>
+              </div>
+
+              {/* 5. 录入病历区块（就诊医院 / 医生诊断 / 病历与化验单照片） */}
+              <div className="rounded-[20px] border border-[#d6e0f2] bg-[#f2f6ff]/85 p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-[13px] font-extrabold text-[#1e3c72]">
+                    <img
+                      src="/assets/extracted/health_firstaid_kit.png"
+                      alt=""
+                      aria-hidden="true"
+                      className="h-5 w-5 object-contain"
+                    />
+                    <span>录入病历（选填）</span>
+                  </div>
+                  <span className="text-[10.5px] font-medium text-[#5c7299]">
+                    可记录医院、诊断与处方拍照
+                  </span>
                 </div>
+
+                <input
+                  type="text"
+                  value={hospital}
+                  onChange={(e) => setHospital(e.target.value)}
+                  placeholder="就诊医院 / 科室（如：市儿童医院 · 儿科）"
+                  className="w-full rounded-xl border border-[#d0dcf0] bg-white px-3 py-2 text-[12.5px] text-[#1e2c49] placeholder:text-[#98a6bf] focus:border-[#6388cc] focus:outline-none"
+                />
+
+                <textarea
+                  rows={2}
+                  maxLength={200}
+                  value={diagnosis}
+                  onChange={(e) => setDiagnosis(e.target.value)}
+                  placeholder="医生诊断结论、化验结果或复诊医嘱..."
+                  className="w-full resize-none rounded-xl border border-[#d0dcf0] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#1e2c49] placeholder:text-[#98a6bf] focus:border-[#6388cc] focus:outline-none"
+                />
+
+                {/* 病历 / 化验单照片上传 */}
+                <div>
+                  <input
+                    ref={casePhotoInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleUploadCasePhotos}
+                    className="hidden"
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    {casePhotos.map((src, idx) => (
+                      <div
+                        key={idx}
+                        className="relative h-14 w-14 overflow-hidden rounded-xl border border-[#c7d6ee] bg-white shadow-xs"
+                      >
+                        <img
+                          src={src}
+                          alt={`病历附件 ${idx + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCasePhotos((prev) => prev.filter((_, i) => i !== idx))
+                          }
+                          aria-label="移除照片"
+                          className="absolute right-0.5 top-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-black/60 text-white"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+
+                    {casePhotos.length < 4 && (
+                      <button
+                        type="button"
+                        onClick={() => casePhotoInputRef.current?.click()}
+                        className="flex h-14 items-center gap-1.5 rounded-xl border border-dashed border-[#9fb6dd] bg-white/90 px-3 text-[11.5px] font-bold text-[#2b5298] transition-colors hover:bg-[#e9f1ff] active:scale-95"
+                      >
+                        <Camera className="h-4 w-4" />
+                        <span>
+                          {casePhotos.length === 0
+                            ? '上传病历/化验单照片'
+                            : `继续添加 (${casePhotos.length}/4)`}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 记录时间快捷微调行 */}
+              <div className="flex items-center justify-between px-0.5 text-[11px] text-[#8d8172]">
+                <button
+                  type="button"
+                  onClick={() => setShowFormTimeRow((v) => !v)}
+                  className="font-typewriter underline decoration-dotted underline-offset-2"
+                >
+                  记录时间：{illDate.replace(/-/g, '.')} {illTime}（点此修改）
+                </button>
+                <span className="font-typewriter tabular-nums">{medication.length}/150</span>
               </div>
 
               {/* 底部操作按钮：取消 + 保存 */}
@@ -1566,12 +1786,38 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                     aria-hidden="true"
                     className="h-4 w-4 object-contain"
                   />
-                  <span>保存</span>
+                  <span>保存记录</span>
                 </button>
               </div>
             </div>
           </div>
         </form>
+      )}
+
+      {/* 病历照片全屏大图灯箱 */}
+      {lightboxPhoto && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs"
+          onClick={() => setLightboxPhoto(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="病历照片大图预览"
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxPhoto(null)}
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white"
+            aria-label="关闭大图"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={lightboxPhoto}
+            alt="病历照片大图"
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[82dvh] max-w-full rounded-[22px] object-contain shadow-[0_20px_48px_rgba(0,0,0,0.65)]"
+          />
+        </div>
       )}
     </div>
   );

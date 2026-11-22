@@ -11,6 +11,7 @@ export type ScreenCode =
   | '3.3'
   | '4.1'
   | '4.2'
+  | '4.3'
   | '5.1'
   | '5.2'
   | '5.3'
@@ -18,10 +19,14 @@ export type ScreenCode =
   | '6.1';
 
 export interface BabyProfile {
+  babyId?: string;
   name: string;
   planetName: string;
   birthDate: string; // YYYY-MM-DD or '' when uninitialized
   gender: 'boy' | 'girl' | 'star';
+  isPreterm?: boolean;
+  gestationalAgeWeeks?: number; // 出生孕周（如 34）
+  expectedDueDate?: string; // 预产期 YYYY-MM-DD（如适用）
   recorders: string[];
 }
 
@@ -55,13 +60,19 @@ export interface FeedingRecord {
   recorder: string;
 }
 
+export type GrowthMeasurementMethod = 'recumbent' | 'standing';
+
 export interface GrowthRecord {
   id: string;
   date: string; // YYYY-MM-DD
-  heightCm: number;
-  weightKg: number;
-  headCm: number;
+  heightCm?: number;
+  weightKg?: number;
+  headCm?: number;
+  measurementMethod?: GrowthMeasurementMethod;
   note: string;
+  isDemo?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type VaccineStatus = 'activated' | 'next' | 'locked';
@@ -83,19 +94,33 @@ export interface VaccineDose {
 }
 
 export type IllnessCareCategory = 'temperature' | 'medicine' | 'hydration';
+export type DiseasePresetTag =
+  | '体温异常'
+  | '发烧'
+  | '感冒'
+  | '皮疹'
+  | '咳嗽'
+  | '腹泻'
+  | '过敏'
+  | '自定义';
 
 export interface IllnessRecord {
   id: string;
   date: string;
   time: string;
+  diseaseName?: string;
+  diseaseTag?: DiseasePresetTag;
   careCategory?: IllnessCareCategory;
   title?: string;
   summary?: string;
   amountMl?: number;
   handled?: boolean;
-  temperatureC: number;
+  temperatureC?: number;
   symptoms: string[];
   medication: string;
+  hospital?: string;
+  diagnosis?: string;
+  casePhotos?: string[];
   recorder: string;
 }
 

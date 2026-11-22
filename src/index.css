@@ -1,39 +1,21 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   自定义字体挂载区 (Custom Font Hooks)
-   将字体文件放入 /public/fonts/ 目录后，取消下方对应注释即可生效：
+   自定义字体自动挂载说明 (Custom Font Hooks)
+   将 .ttf / .otf / .woff2 / .woff 字体文件上传到以下目录即可自动生效：
+   - /public/fonts/ 或 /public/fonts/body/    -> 自动挂载为 PlanetBody（替换全局正文字体）
+   - /public/fonts/display/                   -> 自动挂载为 PlanetDisplay（手绘标题字体）
+   - /public/fonts/mono/                      -> 自动挂载为 PlanetMono（日期与数字字体）
    ========================================================================== */
-/*
-@font-face {
-  font-family: 'PlanetDisplay';
-  src: url('/fonts/display.woff2') format('woff2');
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-}
 
-@font-face {
-  font-family: 'PlanetBody';
-  src: url('/fonts/body.woff2') format('woff2');
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
+@theme {
+  --font-sans: 'PlanetBody', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
-
-@font-face {
-  font-family: 'PlanetMono';
-  src: url('/fonts/mono.woff2') format('woff2');
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-}
-*/
 
 :root {
-  --font-display: 'PlanetDisplay', 'Ma Shan Zheng', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  --font-display: 'PlanetDisplay', 'Ma Shan Zheng', 'PlanetBody', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
   --font-body: 'PlanetBody', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  --font-typewriter: 'PlanetMono', 'Courier Prime', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-typewriter: 'PlanetMono', 'Courier Prime', 'PlanetBody', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --cosmic-deep: #09132e;
   --cosmic-mid: #12224d;
@@ -43,17 +25,40 @@
   --ink-secondary: #6e6052;
   --star-gold: #f6c445;
   --star-glow: rgba(253, 224, 71, 0.48);
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --app-viewport-h: calc(100dvh - 76px - var(--safe-bottom));
 }
 
 html,
-body {
+body,
+#root {
   margin: 0;
   padding: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
   font-family: var(--font-body);
   background-color: #070e23;
   color: #f8f4e8;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
+}
+
+.pt-safe {
+  padding-top: max(12px, var(--safe-top));
+}
+
+.pb-safe {
+  padding-bottom: max(16px, var(--safe-bottom));
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
 }
 
 .font-display {
@@ -69,50 +74,68 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* 撕纸边缘手帐纸张效果 (Torn-edge cream paper card) */
+/* 撕纸边缘手帐纸张效果 (22-24px 圆角 + 柔和多层阴影) */
 .paper-card {
   background-color: var(--parchment);
   color: var(--ink-primary);
   background-image:
     radial-gradient(rgba(139, 111, 78, 0.06) 1px, transparent 0),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.45) 0%, rgba(239, 224, 197, 0.35) 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.48) 0%, rgba(239, 224, 197, 0.35) 100%);
   background-size: 16px 16px, 100% 100%;
   box-shadow:
-    0 10px 26px -6px rgba(4, 9, 26, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    inset 0 -2px 6px rgba(182, 152, 110, 0.22);
-  border-radius: 18px 20px 19px 17px / 19px 17px 20px 18px;
+    0 12px 28px -8px rgba(4, 9, 26, 0.52),
+    0 4px 12px -4px rgba(4, 9, 26, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    inset 0 -2px 6px rgba(182, 152, 110, 0.2);
+  border-radius: 22px 24px 23px 21px / 23px 21px 24px 22px;
 }
 
 .paper-card-soft {
   background-color: #f9f1df;
   color: var(--ink-primary);
   box-shadow:
-    0 6px 18px -4px rgba(4, 9, 26, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.75);
-  border-radius: 16px 18px 17px 15px;
+    0 10px 26px -8px rgba(4, 9, 26, 0.44),
+    0 3px 10px -3px rgba(4, 9, 26, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  border-radius: 22px;
 }
 
-/* 手绘撕纸边缘卡片 (使用上传素材 diary_paper_clean.png 九宫格拉伸) */
+/* 手绘撕纸边缘卡片 (使用上传素材 diary_paper_clean.png 九宫格拉伸，统一柔和阴影) */
 .diary-paper-card {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   color: #182848;
+  border-radius: 22px;
   border-style: solid;
   border-width: 14px;
   border-image-source: url('/assets/extracted/diary_paper_clean.png');
   border-image-slice: 44 fill;
   border-image-width: 18px;
   border-image-repeat: stretch;
-  filter: drop-shadow(0 8px 18px rgba(4, 10, 28, 0.48));
+  filter: drop-shadow(0 10px 22px rgba(4, 10, 28, 0.44));
 }
 
-/* 贴纸卡片效果 (Sticker card style) */
+/* 贴纸卡片效果 (22px 圆角 + 柔和阴影) */
 .sticker-card {
   background: linear-gradient(135deg, #fffaf0 0%, #f7ead0 100%);
   color: var(--ink-primary);
   border: 2.5px solid #ffffff;
+  border-radius: 22px;
   box-shadow:
-    0 8px 20px -4px rgba(4, 10, 28, 0.5),
-    0 2px 6px rgba(0, 0, 0, 0.16);
+    0 12px 26px -6px rgba(4, 10, 28, 0.48),
+    0 4px 10px -2px rgba(0, 0, 0, 0.16);
+}
+
+/* 星空磨砂玻璃卡片 (22px 圆角 + 柔和阴影) */
+.glass-card {
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(20, 35, 76, 0.56);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 12px 28px -8px rgba(3, 8, 24, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 /* 宇宙星空微纹理 */

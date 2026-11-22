@@ -195,7 +195,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
     filteredDiaries.length > 1 ? (activeIndex / (filteredDiaries.length - 1)) * 62 : 0;
 
   return (
-    <div className="relative flex min-h-full flex-col overflow-x-hidden pb-5">
+    <div className="relative flex min-h-full w-full min-w-0 max-w-full flex-col overflow-x-clip pb-6">
       {/* 宇宙星空背景层 */}
       <div
         className="pointer-events-none absolute inset-0 bg-cover bg-top opacity-75"
@@ -211,7 +211,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
           顶部导航栏：按当前页面视图切换（列表 / 独立详情 / 新建编辑）
          ================================================================= */}
       {mode === 'detail' && activeDetail && !isEmptyView ? (
-        <header className="relative z-20 flex h-[56px] items-center justify-between px-3.5 pt-1">
+        <header className="relative z-20 flex min-h-[56px] items-center justify-between px-4 pt-safe pb-1">
           <button
             type="button"
             onClick={() => onChangeMode('list')}
@@ -246,7 +246,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
           </div>
         </header>
       ) : mode === 'form' ? (
-        <header className="relative z-20 flex h-[56px] items-center justify-between px-3.5 pt-1">
+        <header className="relative z-20 flex min-h-[56px] items-center justify-between px-4 pt-safe pb-1">
           <button
             type="button"
             onClick={() => onChangeMode(returnToDetailAfterForm ? 'detail' : 'list')}
@@ -270,7 +270,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
           </button>
         </header>
       ) : (
-        <header className="relative z-20 flex items-start justify-between px-3.5 pb-1 pt-3">
+        <header className="relative z-20 flex items-start justify-between px-4 pb-1 pt-safe">
           <div className="flex items-start gap-1.5">
             <button
               type="button"
@@ -346,7 +346,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
 
       {/* 日期检索展开条 (仅一级列表页显示) */}
       {showDateFilter && mode === 'list' && (
-        <div className="relative z-20 mx-3.5 mb-2 flex items-center justify-between gap-2 rounded-xl border border-white/15 bg-[#10204a]/85 px-3 py-2 text-xs backdrop-blur-md">
+        <div className="relative z-20 mx-4 mb-2.5 flex items-center justify-between gap-2 rounded-[20px] border border-white/15 bg-[#10204a]/88 px-3.5 py-2.5 text-xs shadow-[0_10px_24px_rgba(3,8,24,0.4)] backdrop-blur-md">
           <span className="text-indigo-100">按日期检索：</span>
           <div className="flex items-center gap-2">
             <input
@@ -372,7 +372,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
           独立「日记详情页」(1:1 还原设计图第二屏)
          ================================================================= */}
       {mode === 'detail' && activeDetail && !isEmptyView && (
-        <div className="relative z-10 flex flex-1 flex-col px-3 pt-1">
+        <div className="relative z-10 flex flex-1 flex-col px-4 pt-1 pb-safe">
           <article className="diary-paper-card relative flex flex-1 flex-col justify-between px-2.5 pt-2">
             <div>
               {/* 顶部元信息行：日期 + 登陆第 N 天 | 右侧大天气图标 */}
@@ -558,7 +558,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
           2.3 写下今日的星光 (1:1 还原设计图第三屏)
          ================================================================= */}
       {mode === 'form' && (
-        <form onSubmit={handleSubmitForm} className="relative z-10 flex flex-1 flex-col px-3 pt-1">
+        <form onSubmit={handleSubmitForm} className="relative z-10 flex flex-1 flex-col px-4 pt-1 pb-safe">
           <div className="diary-paper-card flex flex-1 flex-col justify-between px-2 py-1.5">
             <div className="space-y-3">
               {/* 日期 & 记录人 列表行 */}
@@ -813,8 +813,11 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
           2.2 日记·空状态 (还原设计图底部居中空状态卡)
          ================================================================= */}
       {mode !== 'form' && isEmptyView && (
-        <div className="relative z-10 my-auto flex flex-col items-center px-6 py-6 text-center">
-          <div className="diary-paper-card flex w-full max-w-[300px] flex-col items-center px-4 py-6">
+        <div
+          style={{ minHeight: 'calc(var(--app-viewport-h) - 72px - var(--safe-top))' }}
+          className="relative z-10 flex flex-col items-center justify-center px-5 py-6 text-center"
+        >
+          <div className="diary-paper-card flex w-full max-w-[310px] flex-col items-center px-4 py-6">
             <AssetSlot slotName="empty_diary_net" showSlotTag={showSlotTag}>
               <img
                 src="/assets/extracted/diary_hero_net.png"
@@ -844,7 +847,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
           2.1 日记·一级页面 (点击任意列表项即可进入独立「日记详情页」)
          ================================================================= */}
       {mode === 'list' && !isEmptyView && (
-        <div className="relative z-10 flex flex-col gap-2.5 px-3 pt-1">
+        <div className="relative z-10 flex flex-col gap-4 px-4 pt-1">
           {/* 1. 顶部破形荒野插画横幅卡 */}
           <div className="relative mt-2 pt-3">
             <button
@@ -903,7 +906,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
 
           {/* 2. 中部日记卡片列表 + 右侧金色星光滚动指示条 */}
           <div className="relative pr-2.5">
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3.5">
               {filteredDiaries.map((entry) => {
                 const age = calculatePlanetAge(state.profile.birthDate, entry.date);
                 const isSelected = activeDetail?.id === entry.id;
@@ -997,7 +1000,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-[356px] overflow-hidden rounded-[22px] border border-white/15 bg-[#0e1b3f] shadow-2xl"
+            className="relative w-full max-w-[356px] overflow-hidden rounded-[24px] border border-white/15 bg-[#0e1b3f] shadow-[0_22px_52px_rgba(3,8,24,0.7)]"
           >
             {/* 顶部缩略图切换条 + 关闭按钮 */}
             <div className="flex items-center justify-between gap-2 p-3">

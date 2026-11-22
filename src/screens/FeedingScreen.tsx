@@ -329,7 +329,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
   );
 
   return (
-    <div className="relative flex min-h-full flex-col overflow-x-hidden">
+    <div className="relative flex min-h-full w-full min-w-0 max-w-full flex-col overflow-x-clip">
       {/* 宇宙星空底层背景 */}
       <div
         className="pointer-events-none absolute inset-0 bg-cover bg-top opacity-80"
@@ -344,7 +344,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
       {/* =================================================================
           顶部手绘星空导航栏
          ================================================================= */}
-      <header className="relative z-20 flex h-[54px] items-center justify-between px-4 pt-1">
+      <header className="relative z-20 flex min-h-[54px] items-center justify-between px-4 pt-safe pb-1">
         <button
           type="button"
           onClick={mode === 'form' ? () => onChangeMode('timeline') : onBackHome}
@@ -401,14 +401,14 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
 
       {/* 3.3 帮助提示气泡 */}
       {mode === 'form' && showFormHelp && (
-        <div className="relative z-20 mx-3.5 mb-1.5 rounded-xl border border-amber-200/30 bg-[#132552]/90 px-3 py-2 text-[11.5px] leading-relaxed text-amber-100/95 backdrop-blur-md">
+        <div className="relative z-20 mx-4 mb-2 rounded-[20px] border border-amber-200/30 bg-[#132552]/92 px-3.5 py-2.5 text-[11.5px] leading-relaxed text-amber-100/95 shadow-[0_10px_24px_rgba(3,8,24,0.4)] backdrop-blur-md">
           <strong>源泉</strong>用于记录配方奶量，<strong>能量瓶</strong>用于母乳（支持瓶喂 ml 或亲喂时长），<strong>晨露</strong>用于辅食与维生素等营养品；点击上方「拍照识别」可快速填入刻度。
         </div>
       )}
 
       {/* 3.1 / 3.2 日期切换条 (点击右上角日历展开) */}
       {mode !== 'form' && showDateBar && (
-        <div className="relative z-20 mx-3.5 mb-2 flex items-center justify-between rounded-2xl border border-white/15 bg-[#122350]/85 px-2.5 py-1.5 backdrop-blur-md">
+        <div className="relative z-20 mx-4 mb-2.5 flex items-center justify-between rounded-[20px] border border-white/15 bg-[#122350]/88 px-3 py-1.5 shadow-[0_10px_24px_rgba(3,8,24,0.4)] backdrop-blur-md">
           <button
             type="button"
             onClick={() => setSelectedDate((d) => shiftDate(d, -1))}
@@ -450,7 +450,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
       {mode === 'form' && (
         <form
           onSubmit={handleSubmitForm}
-          className="relative z-10 flex flex-1 flex-col justify-between gap-2.5 px-3 pb-3 pt-1"
+          className="relative z-10 flex flex-1 flex-col justify-between gap-3.5 px-4 pb-safe pt-1"
         >
           <input
             ref={ocrFileRef}
@@ -502,7 +502,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
               <button
                 type="button"
                 onClick={() => ocrFileRef.current?.click()}
-                className={`flex w-full items-center justify-between rounded-2xl border px-3.5 py-2 text-left shadow-sm transition-colors ${
+                className={`flex w-full items-center justify-between rounded-[20px] border px-3.5 py-2.5 text-left shadow-[0_6px_16px_rgba(3,8,24,0.28)] transition-colors ${
                   ocrStatus === 'scanning'
                     ? 'border-amber-200 bg-amber-100/95 text-amber-950 animate-pulse'
                     : 'border-[#d8eab1] bg-gradient-to-r from-[#b9d98c] to-[#cce3a2] text-[#1c3917]'
@@ -780,7 +780,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
             {/* 右侧大号跨 4 行 ⭐ 保存 按钮 */}
             <button
               type="submit"
-              className="row-span-4 flex flex-col items-center justify-center gap-1.5 rounded-[18px] border-2 border-[#fff2b8]/80 bg-gradient-to-b from-[#fde073] via-[#f9ca44] to-[#f1b429] text-[#182848] shadow-[0_6px_18px_rgba(249,207,76,0.45)] transition-transform hover:brightness-105 active:scale-95"
+              className="row-span-4 flex flex-col items-center justify-center gap-1.5 rounded-[20px] border-2 border-[#fff2b8]/80 bg-gradient-to-b from-[#fde073] via-[#f9ca44] to-[#f1b429] text-[#182848] shadow-[0_8px_20px_rgba(249,207,76,0.45)] transition-transform hover:brightness-105 active:scale-95"
             >
               <svg viewBox="0 0 36 36" className="h-8 w-8 drop-shadow-xs" fill="none" aria-hidden="true">
                 <path
@@ -820,12 +820,15 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
           3.2 喂养·空状态 (1:1 还原设计图第二屏)
          ================================================================= */}
       {mode !== 'form' && (isEmptyView || (!showAllRecords && dayFeedings.length === 0)) && (
-        <div className="relative z-10 flex flex-1 flex-col justify-between px-3.5 pb-3 pt-1">
+        <div
+          style={{ minHeight: 'calc(var(--app-viewport-h) - 54px - var(--safe-top))' }}
+          className="relative z-10 flex flex-1 flex-col justify-between px-4 pb-3 pt-1"
+        >
           <div>
             {renderRangePills()}
 
             {/* 空状态折线图玻璃卡片 */}
-            <div className="relative mt-3 rounded-[20px] border border-white/12 bg-[#122452]/62 px-4 pb-6 pt-3.5 shadow-[0_10px_28px_rgba(3,9,28,0.45)] backdrop-blur-md">
+            <div className="relative mt-4 rounded-[22px] border border-white/12 bg-[#122452]/62 px-4 pb-6 pt-3.5 shadow-[0_12px_28px_rgba(3,9,28,0.46)] backdrop-blur-md">
               <div className="flex items-center gap-4 text-[12px] font-medium text-indigo-100/90">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#5cbcff] shadow-[0_0_6px_#5cbcff]" />
@@ -861,7 +864,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
           </div>
 
           {/* 巨大空玻璃奶瓶 + 熟睡小男孩与巴哥犬 + 底部暖金 CTA */}
-          <div className="relative -mx-3.5 mt-2 flex flex-col items-center">
+          <div className="relative -mx-4 mt-3 flex flex-col items-center">
             <AssetSlot slotName="empty_feeding_bottle" showSlotTag={showSlotTag} className="w-full">
               <img
                 src="/assets/extracted/feed_empty_bottle.png"
@@ -887,12 +890,15 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
           3.1 喂养·数据与时间线 (1:1 还原设计图第一屏)
          ================================================================= */}
       {mode === 'timeline' && !isEmptyView && (showAllRecords || dayFeedings.length > 0) && (
-        <div className="relative z-10 flex flex-1 flex-col justify-between px-3.5 pt-1">
-          <div className="space-y-3">
+        <div
+          style={{ minHeight: 'calc(var(--app-viewport-h) - 54px - var(--safe-top))' }}
+          className="relative z-10 flex flex-1 flex-col justify-between px-4 pt-1"
+        >
+          <div className="space-y-4">
             {renderRangePills()}
 
             {/* 深蓝磨砂双 Y 轴折线图卡片 */}
-            <div className="relative rounded-[20px] border border-white/12 bg-[#122452]/65 px-3 pb-2.5 pt-3 shadow-[0_10px_28px_rgba(3,9,28,0.45)] backdrop-blur-md">
+            <div className="relative rounded-[22px] border border-white/12 bg-[#122452]/65 px-3.5 pb-2.5 pt-3 shadow-[0_12px_28px_rgba(3,9,28,0.46)] backdrop-blur-md">
               {/* 右上角点缀发光大星星 */}
               <img
                 src="/assets/extracted/feed_glow_star.png"
@@ -1123,7 +1129,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
           </div>
 
           {/* 底部趴星球托腮小男孩与巴哥犬插画 (自然融入星空底色) */}
-          <div className="pointer-events-none relative -mx-3.5 mt-2 overflow-hidden">
+          <div className="pointer-events-none relative -mx-4 mt-3 overflow-hidden">
             <img
               src="/assets/extracted/feed_boy_pug_planet.png"
               alt="趴在星球上的小男孩与巴哥犬"

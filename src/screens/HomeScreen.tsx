@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Check, ChevronRight, Settings, ShieldAlert, Sparkles } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Check, ChevronLeft, ChevronRight, ShieldAlert, Sparkles } from 'lucide-react';
 import { ChecklistItem, ModuleTab, PlanetAppState, VaccineDose } from '../types/planet';
-import { calculatePlanetAge, formatTypewriterDate, getTodayDateStr } from '../data/initialData';
+import { calculatePlanetAge, getTodayDateStr } from '../data/initialData';
 import {
   AssetSlot,
   IconBottle,
@@ -18,6 +18,7 @@ interface HomeScreenProps {
   onNavigate: (tab: ModuleTab, subMode?: string) => void;
   onToggleChecklist: (id: string) => void;
   onQuickOpenVaccine: (dose: VaccineDose) => void;
+  onOpenSettingsDrawer: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -27,9 +28,47 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigate,
   onToggleChecklist,
   onQuickOpenVaccine,
+  onOpenSettingsDrawer,
 }) => {
   const [recentCheckedId, setRecentCheckedId] = useState<string | null>(null);
   const [todayDate, setTodayDate] = useState<string>(() => getTodayDateStr());
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleSwipeTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    if (!t) return;
+    swipeStartRef.current = { x: t.clientX, y: t.clientY };
+  };
+
+  const handleSwipeTouchEnd = (e: React.TouchEvent) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    const t = e.changedTouches[0];
+    if (!start || !t) return;
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    // 左滑打开星际设置抽屉
+    if (dx < -48 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+      onOpenSettingsDrawer();
+    }
+  };
+
+  const handleSwipePointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
+    swipeStartRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleSwipePointerUp = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (dx < -48 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+      onOpenSettingsDrawer();
+    }
+  };
 
   useEffect(() => {
     const syncDate = () => {
@@ -73,17 +112,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   if (!isInitialized) {
     return (
-      <div className="relative flex min-h-full flex-col justify-between px-5 pb-8 pt-6">
-        <div className="flex items-center justify-between">
-          <span className="font-typewriter text-sm tracking-wide text-amber-100/80">
-            {formatTypewriterDate(todayDate)}
-          </span>
-          <span className="text-xs text-indigo-200/70">未绑定档案</span>
-        </div>
-
-        <div className="my-auto flex flex-col items-center py-10 text-center">
+      <div
+        style={{ minHeight: 'var(--app-viewport-h)' }}
+        onTouchStart={handleSwipeTouchStart}
+        onTouchEnd={handleSwipeTouchEnd}
+        onPointerDown={handleSwipePointerDown}
+        onPointerUp={handleSwipePointerUp}
+        className="relative flex w-full min-w-0 flex-col justify-between px-4 pb-6 pt-safe"
+      >
+        <div className="my-auto flex flex-col items-center py-8 text-center">
           <AssetSlot slotName="empty_planet_signal" showSlotTag={showSlotTag} className="mb-4">
-            <UnconnectedPlanetIllustration className="h-52 w-52 animate-float-slow" />
+            <UnconnectedPlanetIllustration className="h-48 w-48 animate-float-slow" />
           </AssetSlot>
 
           <h1 className="font-display text-3xl tracking-wide text-amber-100 text-balance">
@@ -96,14 +135,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <button
             type="button"
             onClick={() => onNavigate('settings')}
-            className="mt-8 flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-amber-300 px-8 py-3 text-base font-bold text-slate-900 shadow-[0_0_24px_rgba(252,211,77,0.45)] transition-transform hover:bg-amber-200 active:scale-[0.97]"
+            className="mt-7 flex min-h-[48px] items-center justify-center gap-2 rounded-[22px] bg-amber-300 px-8 py-3 text-base font-bold text-slate-900 shadow-[0_10px_26px_rgba(252,211,77,0.42)] transition-transform hover:bg-amber-200 active:scale-[0.97]"
           >
             <Sparkles className="h-5 w-5" />
             <span>初始化档案</span>
           </button>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-xs text-indigo-100/65">
+        <div className="glass-card px-4 py-3.5 text-center text-xs text-indigo-100/75">
           初始化后即可解锁每日喂养追踪、成长曲线与 19 剂疫苗护盾
         </div>
       </div>
@@ -111,11 +150,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }
 
   return (
-    <div className="relative flex flex-col pb-6">
+    <div
+      onTouchStart={handleSwipeTouchStart}
+      onTouchEnd={handleSwipeTouchEnd}
+      onPointerDown={handleSwipePointerDown}
+      onPointerUp={handleSwipePointerUp}
+      className="relative flex w-full min-w-0 max-w-full flex-col overflow-x-clip pb-6"
+    >
       {/* =================================================================
-          1:1 复刻首页主视觉画布 (941:1510 对应底部导航上方区域)
+          首屏独立视口容器：严格锁定为 --app-viewport-h，确保下滑板块（早教清单）不局部露出
          ================================================================= */}
-      <div className="relative w-full aspect-[941/1510] overflow-hidden select-none">
+      <section
+        style={{ minHeight: 'var(--app-viewport-h)' }}
+        className="relative flex w-full min-w-0 flex-col justify-start overflow-hidden bg-[#091535] select-none"
+        aria-label="星球主视觉"
+      >
+        <div className="relative w-full aspect-[941/1490] shrink-0 overflow-hidden select-none">
         {/* Layer 1: 宇宙星空背景 (顶部星星、左侧土星、右上发光大星星；渐隐原图底部地球防重影) */}
         <img
           src="/assets/aistudio/____f8d9ecf9.png"
@@ -197,28 +247,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* 底部自然渐隐至星空底色 */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-gradient-to-t from-[#091535] via-[#091535]/50 to-transparent" />
 
-        {/* Layer 5: 顶部打字机日期 + 轻量档案设置入口 (精确锁定 top: 1.8%) */}
-        <div className="absolute left-4 right-4 top-[1.8%] z-40 flex items-center justify-between">
-          <div className="pointer-events-none flex items-center gap-1.5">
-            <span className="font-typewriter text-[14.5px] font-normal tracking-wider text-white/95 drop-shadow">
-              {formatTypewriterDate(todayDate)}
-            </span>
-            <span className="text-[11px] text-amber-200/95" aria-hidden="true">✦</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => onNavigate('settings')}
-            aria-label="宝宝档案与设置"
-            className="flex h-7 w-7 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-amber-200 active:scale-95"
-          >
-            <Settings className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        {/* 右侧极轻星光边缘把手：左滑首页任意区域或轻触此微光把手均可呼出设置抽屉，不破坏主画面构图 */}
+        <button
+          type="button"
+          onClick={onOpenSettingsDrawer}
+          aria-label="左滑或点击打开设置抽屉"
+          title="左滑打开设置"
+          className="absolute right-0 top-[44%] z-40 flex h-14 w-5 items-center justify-center rounded-l-[14px] border border-r-0 border-amber-200/25 bg-[#12224d]/45 text-amber-100/75 backdrop-blur-sm shadow-[-4px_0_14px_rgba(3,8,24,0.35)] transition-all hover:w-6 hover:bg-[#1a3069]/75 hover:text-amber-200 active:scale-95"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </button>
 
-        {/* Layer 5b: 顶部快捷状态栏 (完整一体化半透明磨砂大胶囊，精确锁定 top: 4.8%) */}
-        <div className="absolute inset-x-3 top-[4.8%] z-40">
+        {/* Layer 5: 顶部快捷状态栏 (无日期/设置图标干扰，紧贴顶部安全区下方舒展排布) */}
+        <div className="absolute inset-x-3.5 top-[max(2.8%,var(--safe-top))] z-40">
           <AssetSlot slotName="home_quick_capsules" showSlotTag={showSlotTag}>
-            <div className="grid grid-cols-4 items-center rounded-full border border-white/15 bg-[#16254e]/55 px-1.5 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),0_8px_20px_rgba(4,9,26,0.42)]">
+            <div className="grid grid-cols-4 items-center rounded-[24px] border border-white/15 bg-[#16254e]/55 px-1.5 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),0_10px_24px_rgba(4,9,26,0.44)]">
               {/* 1. 日记 */}
               <button
                 type="button"
@@ -307,7 +350,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           type="button"
           onClick={() => onNavigate('settings')}
           aria-label="编辑宝宝信息"
-          className="absolute left-6 top-[15.2%] z-30 max-w-[66%] origin-left -rotate-[3deg] transform text-left transition-transform active:scale-[0.98]"
+          className="absolute left-6 top-[calc(14.5%+var(--safe-top)*0.45)] z-30 max-w-[66%] origin-left -rotate-[3deg] transform text-left transition-transform active:scale-[0.98]"
         >
           <div className="inline-block">
             <h1
@@ -368,9 +411,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </p>
         </button>
 
-        {/* Layer 7: 地球观测记录弧线文字 + 弯曲星星箭头 */}
+        {/* Layer 7: 地球观测记录弧线文字 + 弯曲星星箭头 (适配 375/390/430px 无溢出) */}
         <div className="pointer-events-none absolute inset-x-4 top-[74.5%] z-30 flex items-center justify-center transform -rotate-[3.5deg]">
-          <p className="text-[12.5px] font-medium tracking-wide text-[#fff8e7] drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)] whitespace-nowrap">
+          <p className="max-w-full truncate text-[clamp(11px,3vw,13px)] font-medium tracking-wide text-[#fff8e7] drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)]">
             地球观测记录：发现植物，以及三只毛茸茸的原住民。
           </p>
         </div>
@@ -461,98 +504,101 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
           </AssetSlot>
         </div>
-      </div>
-
-      {/* =================================================================
-          下方扩展区：早教清单 (含 ✓ 与星星动画) + 贴纸风格疫苗提醒卡
-         ================================================================= */}
-      <section className="mt-2 px-3.5" aria-label="每日早教探索清单">
-        <div className="paper-card-soft px-4 py-3.5">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-[#2d251e]">今日星球早教清单</h2>
-            <span className="text-xs font-medium text-[#756657] tabular-nums">
-              已完成 {state.checklist.filter((c) => c.completed).length}/{state.checklist.length}
-            </span>
-          </div>
-
-          <div className="divide-y divide-[#e6d8be]">
-            {state.checklist.map((item) => {
-              const isBursting = recentCheckedId === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleCheck(item)}
-                  className="relative flex w-full min-h-[48px] items-center justify-between gap-3 py-2.5 text-left transition-colors hover:bg-[#f3e6cc]/50 active:scale-[0.99]"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span
-                      className={`relative flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition-all duration-200 ${
-                        item.completed
-                          ? 'border-[#5c9442] bg-[#6ca651] text-white'
-                          : 'border-[#b9a78e] bg-white/80 text-transparent'
-                      }`}
-                    >
-                      <Check className="h-4 w-4 stroke-[3]" />
-                      {isBursting && (
-                        <span className="pointer-events-none absolute -right-2 -top-2 animate-star-pop">
-                          <IconStar className="h-5 w-5" />
-                        </span>
-                      )}
-                    </span>
-                    <div className="min-w-0">
-                      <div
-                        className={`text-sm font-semibold truncate transition-colors ${
-                          item.completed ? 'text-[#87796b] line-through' : 'text-[#2d251e]'
-                        }`}
-                      >
-                        {item.title}
-                      </div>
-                      <div className="text-xs text-[#7c6e5f] truncate">{item.subtitle}</div>
-                    </div>
-                  </div>
-                  {item.completed && (
-                    <span className="shrink-0 text-xs font-semibold text-[#55843d]">★ 已点亮</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
         </div>
       </section>
 
-      {nextVaccine && (
-        <section className="mt-4 px-3.5" aria-label="下一针疫苗提醒">
-          <div className="sticker-card relative overflow-hidden rounded-2xl p-3.5 transform -rotate-[0.6deg]">
-            <div className="pointer-events-none absolute -top-1 left-1/2 h-3.5 w-16 -translate-x-1/2 rounded-sm bg-amber-200/80 shadow-xs" />
+      {/* =================================================================
+          第二屏下方扩展区：早教清单 + 贴纸风格疫苗提醒卡（向下滑动后才完整显现）
+         ================================================================= */}
+      <div className="mt-4 flex flex-col gap-4 px-4">
+        <section aria-label="每日早教探索清单">
+          <div className="paper-card-soft px-4 py-4">
+            <div className="mb-2.5 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-[#2d251e]">今日星球早教清单</h2>
+              <span className="text-xs font-medium text-[#756657] tabular-nums">
+                已完成 {state.checklist.filter((c) => c.completed).length}/{state.checklist.length}
+              </span>
+            </div>
 
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 border border-sky-200">
-                  <IconShield className="h-8 w-8" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
-                    <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
-                    <span>下一针防御护盾提醒 · {nextVaccine.recommendedMonth}</span>
-                  </div>
-                  <div className="mt-0.5 text-sm font-bold text-[#2d251e] truncate">
-                    {nextVaccine.name}（{nextVaccine.doseLabel}）
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onQuickOpenVaccine(nextVaccine)}
-                className="shrink-0 min-h-[40px] rounded-xl bg-[#1b336b] px-3.5 py-2 text-xs font-semibold text-amber-100 shadow-sm transition-transform hover:bg-[#234185] active:scale-95 whitespace-nowrap"
-              >
-                去打卡
-              </button>
+            <div className="divide-y divide-[#e6d8be]">
+              {state.checklist.map((item) => {
+                const isBursting = recentCheckedId === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleCheck(item)}
+                    className="relative flex w-full min-h-[48px] items-center justify-between gap-3 py-2.5 text-left transition-colors hover:bg-[#f3e6cc]/50 active:scale-[0.99]"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span
+                        className={`relative flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition-all duration-200 ${
+                          item.completed
+                            ? 'border-[#5c9442] bg-[#6ca651] text-white'
+                            : 'border-[#b9a78e] bg-white/80 text-transparent'
+                        }`}
+                      >
+                        <Check className="h-4 w-4 stroke-[3]" />
+                        {isBursting && (
+                          <span className="pointer-events-none absolute -right-2 -top-2 animate-star-pop">
+                            <IconStar className="h-5 w-5" />
+                          </span>
+                        )}
+                      </span>
+                      <div className="min-w-0">
+                        <div
+                          className={`text-sm font-semibold truncate transition-colors ${
+                            item.completed ? 'text-[#87796b] line-through' : 'text-[#2d251e]'
+                          }`}
+                        >
+                          {item.title}
+                        </div>
+                        <div className="text-xs text-[#7c6e5f] truncate">{item.subtitle}</div>
+                      </div>
+                    </div>
+                    {item.completed && (
+                      <span className="shrink-0 text-xs font-semibold text-[#55843d]">★ 已点亮</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </section>
-      )}
+
+        {nextVaccine && (
+          <section aria-label="下一针疫苗提醒">
+            <div className="sticker-card relative overflow-hidden rounded-[22px] p-4 transform -rotate-[0.4deg]">
+              <div className="pointer-events-none absolute -top-1 left-1/2 h-3.5 w-16 -translate-x-1/2 rounded-sm bg-amber-200/80 shadow-xs" />
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-100 border border-sky-200">
+                    <IconShield className="h-8 w-8" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
+                      <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">下一针防御护盾提醒 · {nextVaccine.recommendedMonth}</span>
+                    </div>
+                    <div className="mt-0.5 text-sm font-bold text-[#2d251e] truncate">
+                      {nextVaccine.name}（{nextVaccine.doseLabel}）
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onQuickOpenVaccine(nextVaccine)}
+                  className="shrink-0 min-h-[40px] rounded-2xl bg-[#1b336b] px-3.5 py-2 text-xs font-semibold text-amber-100 shadow-sm transition-transform hover:bg-[#234185] active:scale-95 whitespace-nowrap"
+                >
+                  去打卡
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   );
 };

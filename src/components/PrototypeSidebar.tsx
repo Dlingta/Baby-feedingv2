@@ -2,13 +2,23 @@ import React from 'react';
 import { FolderOpen, Layers, RotateCcw, Smartphone, Tag } from 'lucide-react';
 import { ScreenCode } from '../types/planet';
 
+export type PreviewWidthPreset = 375 | 390 | 430;
+
 interface PrototypeSidebarProps {
   activeScreen: ScreenCode;
   showSlotTag: boolean;
+  previewWidth: PreviewWidthPreset;
+  onSelectPreviewWidth: (width: PreviewWidthPreset) => void;
   onSelectScreen: (code: ScreenCode) => void;
   onToggleSlotTag: () => void;
   onResetDemo: () => void;
 }
+
+const WIDTH_PRESETS: { width: PreviewWidthPreset; ratioLabel: string }[] = [
+  { width: 375, ratioLabel: '375×667' },
+  { width: 390, ratioLabel: '390×694' },
+  { width: 430, ratioLabel: '430×764' },
+];
 
 const SCREEN_GROUPS: {
   title: string;
@@ -40,8 +50,9 @@ const SCREEN_GROUPS: {
   {
     title: '4. 观测坐标 (Growth)',
     items: [
-      { code: '4.1', label: '4.1 成长 · 走势与读数气泡' },
-      { code: '4.2', label: '4.2 成长 · 测量录入表单' },
+      { code: '4.1', label: '4.1 成长 · 走势与历史' },
+      { code: '4.2', label: '4.2 成长 · 专业营养评价' },
+      { code: '4.3', label: '4.3 成长 · 新建成长记录' },
     ],
   },
   {
@@ -49,8 +60,8 @@ const SCREEN_GROUPS: {
     items: [
       { code: '5.1', label: '5.1 健康 · 19剂疫苗护盾' },
       { code: '5.2', label: '5.2 健康 · 疫苗打卡弹窗' },
-      { code: '5.3', label: '5.3 健康 · 异常修复护理' },
-      { code: '5.4', label: '5.4 健康 · 新建护理表单' },
+      { code: '5.3', label: '5.3 健康 · 生病与病历记录' },
+      { code: '5.4', label: '5.4 健康 · 新建生病与病历' },
     ],
   },
   {
@@ -62,6 +73,8 @@ const SCREEN_GROUPS: {
 export const PrototypeSidebar: React.FC<PrototypeSidebarProps> = ({
   activeScreen,
   showSlotTag,
+  previewWidth,
+  onSelectPreviewWidth,
   onSelectScreen,
   onToggleSlotTag,
   onResetDemo,
@@ -72,16 +85,50 @@ export const PrototypeSidebar: React.FC<PrototypeSidebarProps> = ({
         <div>
           <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
             <Smartphone className="h-4 w-4" />
-            <span>原型页面索引（15 个核心视图）</span>
+            <span>原型页面索引（16 个核心视图）</span>
           </div>
           <p className="mt-1 text-xs text-slate-400">
-            右侧为可交互移动端画布，点击下方索引可直达任意状态
+            右侧为 9:16 可交互移动端画布，支持 375/390/430px 宽度预览
           </p>
         </div>
       </div>
 
+      {/* 9:16 屏幕宽度切换 */}
+      <div className="mt-3.5 rounded-[20px] border border-white/10 bg-white/[0.04] p-2.5">
+        <div className="mb-2 flex items-center justify-between px-1 text-[11px] font-semibold text-indigo-200/80">
+          <span>9:16 屏幕尺寸预览</span>
+          <span className="font-typewriter text-amber-200">{previewWidth}px</span>
+        </div>
+        <div className="grid grid-cols-3 gap-1.5">
+          {WIDTH_PRESETS.map((preset) => {
+            const active = previewWidth === preset.width;
+            return (
+              <button
+                key={preset.width}
+                type="button"
+                onClick={() => onSelectPreviewWidth(preset.width)}
+                className={`flex flex-col items-center justify-center rounded-xl py-1.5 text-center transition-colors ${
+                  active
+                    ? 'bg-amber-300 text-slate-900 font-bold shadow-sm'
+                    : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                }`}
+              >
+                <span className="text-xs leading-tight">{preset.width}px</span>
+                <span
+                  className={`mt-0.5 text-[9.5px] font-typewriter ${
+                    active ? 'text-slate-800/80' : 'text-slate-400'
+                  }`}
+                >
+                  {preset.ratioLabel}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* 工具开关 */}
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <button
           type="button"
           onClick={onToggleSlotTag}

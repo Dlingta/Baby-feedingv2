@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   BabyProfile,
   DiaryEntry,
@@ -14,7 +14,8 @@ import {
 } from './types/planet';
 import { createInitialAppState, getTodayDateStr } from './data/initialData';
 import { BottomNav } from './components/BottomNav';
-import { PrototypeSidebar } from './components/PrototypeSidebar';
+import { HomeSettingsDrawer } from './components/HomeSettingsDrawer';
+import { PreviewWidthPreset, PrototypeSidebar } from './components/PrototypeSidebar';
 import { HomeScreen } from './screens/HomeScreen';
 import { DiaryScreen, DiaryViewMode } from './screens/DiaryScreen';
 import { FeedingScreen, FeedingViewMode } from './screens/FeedingScreen';
@@ -23,6 +24,13 @@ import { HealthScreen, HealthViewMode } from './screens/HealthScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 
 const STORAGE_KEY = 'planet_feeding_prototype_state_v1';
+
+// 9:16 移动端预览尺寸映射（内框净尺寸 375×667 / 390×694 / 430×764，外加桌面边框 12px）
+const PREVIEW_FRAME_CLASS: Record<PreviewWidthPreset, string> = {
+  375: 'lg:w-[387px] lg:h-[679px]',
+  390: 'lg:w-[402px] lg:h-[706px]',
+  430: 'lg:w-[442px] lg:h-[776px]',
+};
 
 export default function App() {
   const [state, setState] = useState<PlanetAppState>(() => {
@@ -105,11 +113,12 @@ export default function App() {
           }
 
           if (Array.isArray(parsed.illnesses)) {
-            const isLegacySeedIllnesses =
-              parsed.illnesses.length === 2 &&
-              parsed.illnesses.every((i) => !i.careCategory) &&
-              parsed.illnesses.some((i) => i.id === 'ill-1' && i.time === '22:40');
-            if (isLegacySeedIllnesses) {
+            const isLegacyCareSeed =
+              parsed.illnesses.every((i) => !i.diseaseName) &&
+              (parsed.illnesses.some((i) => i.title === '多喝水' || i.title === '退烧药') ||
+                (parsed.illnesses.length === 2 &&
+                  parsed.illnesses.some((i) => i.id === 'ill-1' && i.time === '22:40')));
+            if (isLegacyCareSeed) {
               parsed.illnesses = freshInit.illnesses;
             } else {
               parsed.illnesses = parsed.illnesses.map((i) => {
@@ -139,14 +148,55 @@ export default function App() {
     return freshInit;
   });
 
-  const [activeTab, setActiveTab] = useState<ModuleTab>('home');
+  const [activeTab, setActiveTab] = useState<ModuleTab>(() => {
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    return hash.startsWith('#/growth/') ? 'growth' : 'home';
+  });
   const [homeForceEmpty, setHomeForceEmpty] = useState(false);
   const [diaryMode, setDiaryMode] = useState<DiaryViewMode>('list');
   const [feedingMode, setFeedingMode] = useState<FeedingViewMode>('timeline');
-  const [growthMode, setGrowthMode] = useState<GrowthViewMode>('chart');
+  const [growthMode, setGrowthMode] = useState<GrowthViewMode>(() => {
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    if (hash === '#/growth/assessment') return 'assessment';
+    if (hash === '#/growth/entry') return 'entry';
+    return 'overview';
+  });
   const [healthMode, setHealthMode] = useState<HealthViewMode>('vaccine');
   const [activeSheetDoseId, setActiveSheetDoseId] = useState<string | null>(null);
   const [showSlotTag, setShowSlotTag] = useState(false);
+  const [previewWidth, setPreviewWidth] = useState<PreviewWidthPreset>(390);
+  const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
+  const scrollViewportRef = useRef<HTMLDivElement | null>(null);
+
+  // 实时同步滚动视口高度到 --app-viewport-h，确保首屏严格满屏且不露出下一板块局部内容
+  useEffect(() => {
+    const el = scrollViewportRef.current;
+    if (!el) return;
+
+    const updateHeight = () => {
+      const h = Math.round(el.getBoundingClientRect().height);
+      if (h > 0) {
+        el.style.setProperty('--app-viewport-h', `${h}px`);
+      }
+    };
+
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(el);
+    window.addEventListener('resize', updateHeight);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, [previewWidth, activeTab, diaryMode, feedingMode, growthMode, healthMode]);
+
+  // 切换页面或子视图时自动回到顶部并收起首页侧滑抽屉
+  useEffect(() => {
+    setIsSettingsDrawerOpen(false);
+    if (scrollViewportRef.current) {
+      scrollViewportRef.current.scrollTo({ top: 0 });
+    }
+  }, [activeTab, diaryMode, feedingMode, growthMode, healthMode, homeForceEmpty]);
 
   useEffect(() => {
     try {
@@ -172,7 +222,9 @@ export default function App() {
       return '3.1';
     }
     if (activeTab === 'growth') {
-      return growthMode === 'form' ? '4.2' : '4.1';
+      if (growthMode === 'assessment') return '4.2';
+      if (growthMode === 'entry') return '4.3';
+      return '4.1';
     }
     if (activeTab === 'health') {
       if (healthMode === 'vaccine_sheet') return '5.2';
@@ -221,11 +273,15 @@ export default function App() {
         break;
       case '4.1':
         setActiveTab('growth');
-        setGrowthMode('chart');
+        setGrowthMode('overview');
         break;
       case '4.2':
         setActiveTab('growth');
-        setGrowthMode('form');
+        setGrowthMode('assessment');
+        break;
+      case '4.3':
+        setActiveTab('growth');
+        setGrowthMode('entry');
         break;
       case '5.1':
         setActiveTab('health');
@@ -263,6 +319,9 @@ export default function App() {
     }
     if (tab === 'feeding' && feedingMode === 'empty') {
       setFeedingMode('timeline');
+    }
+    if (tab === 'growth' && growthMode === 'entry') {
+      setGrowthMode('overview');
     }
     if (tab === 'health' && healthMode === 'vaccine_sheet') {
       setHealthMode('vaccine');
@@ -310,11 +369,17 @@ export default function App() {
     }));
   };
 
-  const handleAddGrowth = (record: GrowthRecord) => {
-    setState((prev) => ({
-      ...prev,
-      growths: [...prev.growths, record],
-    }));
+  const handleSaveGrowth = (record: GrowthRecord) => {
+    setState((prev) => {
+      const exists = prev.growths.some((g) => g.id === record.id);
+      const nextGrowths = exists
+        ? prev.growths.map((g) => (g.id === record.id ? record : g))
+        : [...prev.growths, record];
+      return {
+        ...prev,
+        growths: nextGrowths.sort((a, b) => a.date.localeCompare(b.date)),
+      };
+    });
   };
 
   const handleDeleteGrowth = (id: string) => {
@@ -381,10 +446,15 @@ export default function App() {
   };
 
   const handleAddIllness = (record: IllnessRecord) => {
-    setState((prev) => ({
-      ...prev,
-      illnesses: [record, ...prev.illnesses],
-    }));
+    setState((prev) => {
+      const exists = prev.illnesses.some((item) => item.id === record.id);
+      return {
+        ...prev,
+        illnesses: exists
+          ? prev.illnesses.map((item) => (item.id === record.id ? record : item))
+          : [record, ...prev.illnesses],
+      };
+    });
   };
 
   const handleToggleIllnessHandled = (id: string) => {
@@ -421,28 +491,35 @@ export default function App() {
     setActiveTab('home');
     setDiaryMode('list');
     setFeedingMode('timeline');
-    setGrowthMode('chart');
+    setGrowthMode('overview');
     setHealthMode('vaccine');
   };
 
   const currentScreenCode = getCurrentScreenCode();
 
   return (
-    <div className="flex min-h-[100dvh] w-full bg-[#050b1c] text-slate-100">
-      {/* 桌面端 15 页原型状态索引侧栏 */}
+    <div className="flex min-h-[100dvh] w-full max-w-full overflow-x-clip bg-[#050b1c] text-slate-100">
+      {/* 桌面端 16 页原型状态索引侧栏 */}
       <PrototypeSidebar
         activeScreen={currentScreenCode}
         showSlotTag={showSlotTag}
+        previewWidth={previewWidth}
+        onSelectPreviewWidth={setPreviewWidth}
         onSelectScreen={handleSelectScreenCode}
         onToggleSlotTag={() => setShowSlotTag((v) => !v)}
         onResetDemo={handleResetDemo}
       />
 
-      {/* 主画布区：移动端全屏适配，桌面端居中呈现 390px 手机交互画布 */}
-      <main className="flex flex-1 items-center justify-center lg:p-6">
-        <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden cosmic-canvas lg:h-[844px] lg:max-h-[calc(100dvh-3rem)] lg:w-[396px] lg:rounded-[42px] lg:border-[6px] lg:border-[#1c2c58] lg:shadow-[0_28px_80px_rgba(0,0,0,0.75)]">
-          {/* 滚动内容区 */}
-          <div className="no-scrollbar flex-1 overflow-y-auto overflow-x-hidden">
+      {/* 主画布区：375/390/430px 移动端全屏适配，桌面端居中呈现 9:16 手机交互画布 */}
+      <main className="flex min-w-0 max-w-full flex-1 items-center justify-center overflow-x-clip lg:p-5">
+        <div
+          className={`relative flex h-[100dvh] w-full min-w-0 max-w-[430px] flex-col overflow-hidden cosmic-canvas transition-[width,height] duration-200 ${PREVIEW_FRAME_CLASS[previewWidth]} lg:max-w-none lg:max-h-[calc(100dvh-2.5rem)] lg:rounded-[40px] lg:border-[6px] lg:border-[#1c2c58] lg:shadow-[0_28px_80px_rgba(0,0,0,0.75)]`}
+        >
+          {/* 垂直滚动内容区（严禁横向溢出） */}
+          <div
+            ref={scrollViewportRef}
+            className="app-scroll-viewport no-scrollbar relative min-w-0 w-full flex-1 overflow-y-auto overflow-x-clip overscroll-y-contain"
+          >
             {activeTab === 'home' && (
               <HomeScreen
                 state={state}
@@ -451,6 +528,7 @@ export default function App() {
                 onNavigate={handleNavigateTab}
                 onToggleChecklist={handleToggleChecklist}
                 onQuickOpenVaccine={handleQuickOpenVaccine}
+                onOpenSettingsDrawer={() => setIsSettingsDrawerOpen(true)}
               />
             )}
 
@@ -484,7 +562,8 @@ export default function App() {
                 mode={growthMode}
                 onChangeMode={setGrowthMode}
                 onBackHome={() => handleNavigateTab('home')}
-                onAddGrowth={handleAddGrowth}
+                onOpenSettings={() => handleNavigateTab('settings')}
+                onSaveGrowth={handleSaveGrowth}
                 onDeleteGrowth={handleDeleteGrowth}
               />
             )}
@@ -518,10 +597,11 @@ export default function App() {
             )}
           </div>
 
-          {/* 底部星尘主导航栏 (在日记详情/编辑页、喂养键盘录入页与治愈工坊表单页沉浸隐藏) */}
+          {/* 固定底部星尘主导航栏 (在日记详情/编辑页、喂养键盘录入页、成长录入页与治愈工坊表单页沉浸隐藏) */}
           {!(
             (activeTab === 'diary' && (diaryMode === 'detail' || diaryMode === 'form')) ||
             (activeTab === 'feeding' && feedingMode === 'form') ||
+            (activeTab === 'growth' && growthMode === 'entry') ||
             (activeTab === 'health' && (healthMode === 'vaccine_sheet' || healthMode === 'illness_form'))
           ) && (
             <BottomNav
@@ -530,6 +610,13 @@ export default function App() {
               showSlotTag={showSlotTag}
             />
           )}
+          {/* 首页左滑呼出的星际设置抽屉（严格约束在手机视口框架内，不破坏首页排版） */}
+          <HomeSettingsDrawer
+            open={isSettingsDrawerOpen && activeTab === 'home'}
+            state={state}
+            onClose={() => setIsSettingsDrawerOpen(false)}
+            onNavigate={handleNavigateTab}
+          />
         </div>
       </main>
     </div>
