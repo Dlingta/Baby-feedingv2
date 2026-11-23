@@ -206,7 +206,7 @@ b {
   border-radius: 22px;
 }
 
-/* 手绘撕纸边缘卡片 (使用上传素材 diary_paper_clean.png 九宫格拉伸，含 iOS Safari 暖米白底色兜底) */
+/* 手绘撕纸边缘卡片 (8.7KB 压缩版 WebP 直接内联至 CSS，零外链延迟，杜绝 iOS Safari 路径与简写覆盖问题) */
 .diary-paper-card {
   width: 100%;
   max-width: 100%;
@@ -215,10 +215,9 @@ b {
   background-color: #fbf4e4;
   background-clip: padding-box;
   border-radius: 22px;
-  border-style: solid;
-  border-color: transparent;
-  border-width: 14px;
-  border-image-slice: 44 fill;
+  border: 14px solid transparent;
+  border-image-source: url('./assets/diary_paper_clean.webp');
+  border-image-slice: 22 fill;
   border-image-width: 18px;
   border-image-repeat: stretch;
   filter: drop-shadow(0 10px 22px rgba(4, 10, 28, 0.44));

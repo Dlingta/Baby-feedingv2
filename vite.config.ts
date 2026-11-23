@@ -161,6 +161,9 @@ export default defineConfig(() => {
           'manifest.json',
         ],
         workbox: {
+          skipWaiting: true,
+          clientsClaim: true,
+          cleanupOutdatedCaches: true,
           globPatterns: ['**/*.{js,css,html,woff2}'],
           globIgnores: ['ocr/**'],
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
@@ -293,6 +296,10 @@ export default defineConfig(() => {
         },
       },
     ],
+    build: {
+      // Inline small UI textures (e.g. 8.7KB torn-paper WebP) directly into CSS for 0ms render & zero broken paths
+      assetsInlineLimit: 12288,
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
