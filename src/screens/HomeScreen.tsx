@@ -168,18 +168,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       className="relative flex w-full min-w-0 max-w-full flex-col overflow-x-clip pb-6"
     >
       {/* =================================================================
-          首屏独立视口容器：在 iPhone 15 Pro Max 等修长屏幕上，拉长顶部星空避让灵动岛及其阴影，
-          让整个主视觉（顶部胶囊、标题、插画与下方「收集星光」卡片）作为整体自然下移贴合底部导航栏
+          首屏主视觉容器：与全站其他页面共享同一套顶部安全区基准（--header-top-pad），
+          不再单独把整页压向底部造成上方大块留白，跨各代 iPhone 均保持一致的视觉重心
          ================================================================= */}
       <section
-        style={{ minHeight: 'var(--app-viewport-h)' }}
-        className="relative flex w-full min-w-0 flex-col justify-end overflow-hidden bg-gradient-to-b from-[#060d24] via-[#091535] to-[#091535] pt-[calc(var(--safe-top-resolved,env(safe-area-inset-top,0px))+10px)] select-none"
+        className="relative flex w-full min-w-0 flex-col overflow-hidden bg-gradient-to-b from-[#060d24] via-[#091535] to-[#091535] pt-[max(calc(var(--header-top-pad,14px)-18px),0px)] select-none"
         aria-label="星球主视觉"
       >
-        {/* 顶部灵动岛延伸星空：在各代全面屏 iPhone 上无缝衔接下方插画星空，彻底避让灵动岛及顶部阴影 */}
+        {/* 顶部灵动岛延伸星空：无缝衔接下方插画星空，自然覆盖顶部安全区 */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[290px] overflow-hidden"
+          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[200px] overflow-hidden"
         >
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_24%_28%,rgba(59,112,208,0.22),transparent_58%),radial-gradient(ellipse_at_80%_20%,rgba(250,204,21,0.12),transparent_52%)]" />
           <svg
