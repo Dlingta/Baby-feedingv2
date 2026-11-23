@@ -168,22 +168,59 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       className="relative flex w-full min-w-0 max-w-full flex-col overflow-x-clip pb-6"
     >
       {/* =================================================================
-          首屏独立视口容器：严格锁定为 --app-viewport-h，并在 iPhone 15 Pro Max 等修长屏幕上自然舒展铺满
+          首屏独立视口容器：在 iPhone 15 Pro Max 等修长屏幕上，拉长顶部星空避让灵动岛及其阴影，
+          让整个主视觉（顶部胶囊、标题、插画与下方「收集星光」卡片）作为整体自然下移贴合底部导航栏
          ================================================================= */}
       <section
         style={{ minHeight: 'var(--app-viewport-h)' }}
-        className="relative flex w-full min-w-0 flex-col justify-between overflow-hidden bg-[#091535] pt-[env(safe-area-inset-top,0px)] pb-3 select-none"
+        className="relative flex w-full min-w-0 flex-col justify-end overflow-hidden bg-gradient-to-b from-[#060d24] via-[#091535] to-[#091535] pt-[env(safe-area-inset-top,0px)] select-none"
         aria-label="星球主视觉"
       >
-        <div className="relative w-full aspect-[941/1490] -mb-[17.5%] shrink-0 overflow-hidden select-none">
-        {/* Layer 1: 宇宙星空背景 (顶部星星、左侧土星、右上发光大星星；渐隐原图底部地球防重影) */}
+        {/* 顶部灵动岛延伸星空：在修长屏幕上无缝衔接下方插画星空，彻底避让灵动岛及顶部阴影 */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[220px] overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_24%_28%,rgba(59,112,208,0.22),transparent_58%),radial-gradient(ellipse_at_80%_20%,rgba(250,204,21,0.12),transparent_52%)]" />
+          <svg
+            viewBox="0 0 430 220"
+            className="h-full w-full opacity-85"
+            fill="none"
+            preserveAspectRatio="xMidYMin slice"
+          >
+            <circle cx="46" cy="48" r="1.4" fill="#FFF7D6" opacity="0.7" />
+            <circle cx="118" cy="72" r="1.1" fill="#E0E7FF" opacity="0.6" />
+            <circle cx="196" cy="36" r="1.3" fill="#FEF08A" opacity="0.65" />
+            <circle cx="288" cy="64" r="1.5" fill="#FFF7D6" opacity="0.75" />
+            <circle cx="358" cy="44" r="1.2" fill="#E0E7FF" opacity="0.65" />
+            <circle cx="394" cy="96" r="1.4" fill="#FEF08A" opacity="0.7" />
+            <circle cx="78" cy="112" r="1.2" fill="#E0E7FF" opacity="0.55" />
+            <circle cx="242" cy="108" r="1.1" fill="#FFF7D6" opacity="0.55" />
+            <circle cx="332" cy="118" r="1.3" fill="#FEF08A" opacity="0.6" />
+            <path
+              d="M62 84L63.3 87.6L67 88.8L63.3 90L62 93.6L60.7 90L57 88.8L60.7 87.6L62 84Z"
+              fill="#FDE047"
+              opacity="0.7"
+            />
+            <path
+              d="M368 80L369.5 84.2L373.8 85.6L369.5 87L368 91.2L366.5 87L362.2 85.6L366.5 84.2L368 80Z"
+              fill="#FDE68A"
+              opacity="0.75"
+            />
+          </svg>
+        </div>
+
+        <div className="relative z-10 w-full aspect-[941/1490] shrink-0 overflow-hidden select-none">
+        {/* Layer 1: 宇宙星空背景 (顶部柔化过渡无缝衔接延伸星空，底部渐隐防重影) */}
         <img
           src="./assets/aistudio/____f8d9ecf9.png"
           alt="宇宙星空"
           referrerPolicy="no-referrer"
           style={{
-            WebkitMaskImage: 'linear-gradient(to bottom, black 56%, transparent 72%)',
-            maskImage: 'linear-gradient(to bottom, black 56%, transparent 72%)',
+            WebkitMaskImage:
+              'linear-gradient(to bottom, transparent 0%, black 11%, black 56%, transparent 72%)',
+            maskImage:
+              'linear-gradient(to bottom, transparent 0%, black 11%, black 56%, transparent 72%)',
           }}
           className="pointer-events-none absolute -top-[4.3%] left-0 w-full h-auto"
         />
@@ -457,10 +494,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           />
         </svg>
 
-        </div>
-
-        {/* Layer 8: 底部米白色撕纸摘要卡片 (独立于插画容器底部，在修长手机屏幕上自然贴合底部导航栏) */}
-        <div className="relative z-30 mt-auto px-3 pt-1">
+        {/* Layer 8: 底部米白色撕纸摘要卡片 (随主视觉整体自然下移贴合底部导航栏，不与草地割裂) */}
+        <div className="absolute inset-x-3 bottom-[2.2%] z-30">
           <AssetSlot slotName="paper_summary_card" showSlotTag={showSlotTag}>
             <div className="relative w-full select-none">
               <img
@@ -525,6 +560,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </div>
             </div>
           </AssetSlot>
+        </div>
         </div>
       </section>
 

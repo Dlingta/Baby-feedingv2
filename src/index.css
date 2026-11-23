@@ -54,7 +54,7 @@ body,
 }
 
 .pt-safe {
-  padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
+  padding-top: calc(env(safe-area-inset-top, 0px) + 18px);
 }
 
 .pb-safe {
