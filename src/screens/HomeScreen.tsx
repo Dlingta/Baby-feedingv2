@@ -162,7 +162,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
          ================================================================= */}
       <section
         style={{ minHeight: 'var(--app-viewport-h)' }}
-        className="relative flex w-full min-w-0 flex-col justify-start overflow-hidden bg-[#091535] select-none"
+        className="relative flex w-full min-w-0 flex-col justify-start overflow-hidden bg-[#091535] pt-[env(safe-area-inset-top,0px)] select-none"
         aria-label="星球主视觉"
       >
         <div className="relative w-full aspect-[941/1490] shrink-0 overflow-hidden select-none">
@@ -258,8 +258,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <ChevronLeft className="h-3.5 w-3.5" />
         </button>
 
-        {/* Layer 5: 顶部快捷状态栏 (无日期/设置图标干扰，紧贴顶部安全区下方舒展排布) */}
-        <div className="absolute inset-x-3.5 top-[max(2.8%,var(--safe-top))] z-40">
+        {/* Layer 5: 顶部快捷状态栏 (紧贴顶部安全区下方舒展排布，避开灵动岛) */}
+        <div className="absolute inset-x-3.5 top-[2.8%] z-40">
           <AssetSlot slotName="home_quick_capsules" showSlotTag={showSlotTag}>
             <div className="grid grid-cols-4 items-center rounded-[24px] border border-white/15 bg-[#16254e]/55 px-1.5 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),0_10px_24px_rgba(4,9,26,0.44)]">
               {/* 1. 日记 */}
@@ -350,7 +350,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           type="button"
           onClick={() => onNavigate('settings')}
           aria-label="编辑宝宝信息"
-          className="absolute left-6 top-[calc(14.5%+var(--safe-top)*0.45)] z-30 max-w-[66%] origin-left -rotate-[3deg] transform text-left transition-transform active:scale-[0.98]"
+          className="absolute left-6 top-[14.5%] z-30 max-w-[66%] origin-left -rotate-[3deg] transform text-left transition-transform active:scale-[0.98]"
         >
           <div className="inline-block">
             <h1

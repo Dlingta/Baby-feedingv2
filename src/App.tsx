@@ -22,6 +22,7 @@ import { FeedingScreen, FeedingViewMode } from './screens/FeedingScreen';
 import { GrowthScreen, GrowthViewMode } from './screens/GrowthScreen';
 import { HealthScreen, HealthViewMode } from './screens/HealthScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { OfflineIndicator } from './components/PWAInstallButton';
 
 const STORAGE_KEY = 'planet_feeding_prototype_state_v1';
 
@@ -540,6 +541,7 @@ export default function App() {
         <div
           className={`relative flex h-[100dvh] w-full min-w-0 max-w-[430px] flex-col overflow-hidden cosmic-canvas transition-[width,height] duration-200 ${PREVIEW_FRAME_CLASS[previewWidth]} lg:max-w-none lg:max-h-[calc(100dvh-2.5rem)] lg:rounded-[40px] lg:border-[6px] lg:border-[#1c2c58] lg:shadow-[0_28px_80px_rgba(0,0,0,0.75)]`}
         >
+          <OfflineIndicator />
           {/* 垂直滚动内容区（严禁横向溢出） */}
           <div
             ref={scrollViewportRef}

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { ModuleTab, PlanetAppState } from '../types/planet';
 import { calculatePlanetAge, getTodayDateStr } from '../data/initialData';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HomeSettingsDrawerProps {
   open: boolean;
@@ -211,6 +212,9 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
               </button>
             </div>
           </div>
+
+          {/* 添加到主屏幕 / PWA 安装入口（独立模式下自动隐藏） */}
+          <PWAInstallButton compact />
         </div>
 
         {/* 底部手势提示 */}

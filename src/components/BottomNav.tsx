@@ -61,7 +61,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   return (
     <nav
       aria-label="主导航栏"
-      className="relative z-40 w-full shrink-0 border-t border-white/[0.08] bg-gradient-to-t from-[#060d23] via-[#091432]/96 to-[#091432]/86 px-2.5 pt-2 pb-[max(10px,env(safe-area-inset-bottom,0px))] backdrop-blur-md shadow-[0_-10px_28px_rgba(3,8,22,0.58)]"
+      className="relative z-40 w-full shrink-0 border-t border-white/[0.08] bg-gradient-to-t from-[#060d23] via-[#091432]/96 to-[#091432]/86 px-2.5 pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+8px)] backdrop-blur-md shadow-[0_-10px_28px_rgba(3,8,22,0.58)]"
     >
       {/* 连接 5 个手绘按钮的星尘波浪细线 + 4 颗小黄星 */}
       <div className="pointer-events-none absolute inset-x-3 top-[29px] h-5" aria-hidden="true">

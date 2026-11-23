@@ -1640,7 +1640,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
             type="button"
             onClick={() => setLightboxPhotoUrl(null)}
             aria-label="关闭照片预览"
-            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-md transition-transform active:scale-90"
+            className="absolute right-4 top-[calc(env(safe-area-inset-top,0px)+12px)] flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-md transition-transform active:scale-90"
           >
             <X className="h-5 w-5" />
           </button>

@@ -84,6 +84,18 @@ async function startServer() {
 
   app.use(express.json({ limit: '12mb' }));
 
+  app.use('/fonts', (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    if (req.path.endsWith('.woff2')) {
+      res.setHeader('Content-Type', 'font/woff2');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (req.path.endsWith('.woff')) {
+      res.setHeader('Content-Type', 'font/woff');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+    next();
+  });
+
   app.use('/api', (req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');

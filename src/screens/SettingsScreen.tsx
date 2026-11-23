@@ -10,6 +10,7 @@ import {
 import { BabyProfile, PlanetAppState } from '../types/planet';
 import { calculatePlanetAge, getTodayDateStr } from '../data/initialData';
 import { CosmicModuleHeader } from '../components/CosmicModuleHeader';
+import { PWAInstallButton } from '../components/PWAInstallButton';
 
 interface SettingsScreenProps {
   state: PlanetAppState;
@@ -409,6 +410,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </button>
           </div>
         </section>
+
+        {/* 4. iPhone / 主屏幕安装入口（已安装后自动隐藏） */}
+        <PWAInstallButton />
       </div>
     </div>
   );

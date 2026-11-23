@@ -43,6 +43,8 @@ body,
   width: 100%;
   max-width: 100%;
   overflow-x: clip;
+  overscroll-behavior-y: none;
+  touch-action: manipulation;
   font-family: var(--font-body);
   background-color: #070e23;
   color: #f8f4e8;
@@ -51,11 +53,11 @@ body,
 }
 
 .pt-safe {
-  padding-top: max(12px, var(--safe-top));
+  padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
 }
 
 .pb-safe {
-  padding-bottom: max(16px, var(--safe-bottom));
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
 }
 
 button,
