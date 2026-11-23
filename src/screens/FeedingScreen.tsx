@@ -11,7 +11,6 @@ import {
   Loader2,
   Pencil,
   Plus,
-  RefreshCw,
   Trash2,
   X,
 } from 'lucide-react';
@@ -23,11 +22,7 @@ import {
   CosmicSubHeader,
   HandDrawnInfoIcon,
 } from '../components/CosmicModuleHeader';
-import {
-  processFeedingPhotoFile,
-  recognizeFeedingPhoto,
-  type ProcessedFeedingPhoto,
-} from '../utils/feedingPhoto';
+import { processFeedingPhotoFile } from '../utils/feedingPhoto';
 
 export type FeedingViewMode = 'timeline' | 'empty' | 'form';
 type RangeOption = 'day' | 7 | 30 | 90;
@@ -99,20 +94,13 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
   const [formTime, setFormTime] = useState(() => getCurrentTimeStr());
   const [formNote, setFormNote] = useState('');
 
-  // 真实拍照与照片识别状态（默认空闲，未拍照时绝不显示虚假识别结果）
-  type OcrStatus =
-    | 'idle'
-    | 'scanning'
-    | 'done'
-    | 'not_recognized'
-    | 'static_no_backend'
-    | 'error';
-  const [ocrStatus, setOcrStatus] = useState<OcrStatus>('idle');
-  const [ocrMessage, setOcrMessage] = useState('');
-  const [ocrSubNote, setOcrSubNote] = useState('');
+  // 本地拍照/相册留档状态（纯浏览器本地处理，不调用任何外部 API）
+  type PhotoStatus = 'idle' | 'loading' | 'ready' | 'error';
+  const [photoStatus, setPhotoStatus] = useState<PhotoStatus>('idle');
+  const [photoMessage, setPhotoMessage] = useState('');
+  const [photoSubNote, setPhotoSubNote] = useState('');
   const [capturedPhotoUrl, setCapturedPhotoUrl] = useState<string | null>(null);
   const [lightboxPhotoUrl, setLightboxPhotoUrl] = useState<string | null>(null);
-  const lastProcessedPhotoRef = useRef<ProcessedFeedingPhoto | null>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
@@ -179,113 +167,43 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
     });
   }, [state.feedings, selectedDate, isEmptyView, showAllRecords]);
 
-  const runPhotoRecognition = async (photo: ProcessedFeedingPhoto) => {
-    setOcrStatus('scanning');
-    setOcrMessage('正在上传照片并识别奶瓶刻度与喂养信息…');
-    setOcrSubNote('');
-
-    const result = await recognizeFeedingPhoto({
-      imageBase64: photo.uploadBase64,
-      mimeType: photo.uploadMimeType,
-      photoTimeHint: photo.exifTime,
-    });
-
-    if (result.status === 'static_no_backend') {
-      setOcrStatus('static_no_backend');
-      setOcrMessage(result.message);
-      setOcrSubNote(
-        photo.exifTime
-          ? `已读取照片拍摄时间 ${photo.exifTime}，照片会随记录一并保存`
-          : '照片已附上，保存记录时会一并留存'
-      );
-      return;
-    }
-
-    if (result.status === 'error') {
-      setOcrStatus('error');
-      setOcrMessage(result.message);
-      setOcrSubNote('可点击右侧重试，或对照照片在下方手动填写');
-      return;
-    }
-
-    const data = result.data;
-    if (!data.recognized) {
-      setOcrStatus('not_recognized');
-      setOcrMessage(data.summary);
-      setOcrSubNote(data.note || '未修改下方数值，请对准奶瓶刻度/辅食重拍或手动填写');
-      return;
-    }
-
-    if (data.category === 'formula') {
-      setActiveFormTab('source');
-      if (data.amountMl && data.amountMl > 0) {
-        setMlStr(String(data.amountMl));
-      }
-    } else if (data.category === 'breast') {
-      setActiveFormTab('energy');
-      if (data.breastSide === 'left' || data.breastSide === 'right' || data.breastSide === 'both') {
-        setBreastSide(data.breastSide);
-      }
-      if (data.amountMl && data.amountMl > 0) {
-        setBreastUnit('ml');
-        setBreastValStr(String(data.amountMl));
-      } else if (data.durationMin && data.durationMin > 0) {
-        setBreastUnit('min');
-        setBreastValStr(String(data.durationMin));
-      }
-    } else if (data.category === 'solids' || data.category === 'supplement') {
-      setActiveFormTab('dew');
-      setDewSubType(data.category);
-      if (data.foodName) {
-        setFoodName(data.foodName);
-      }
-      if (data.foodAmount) {
-        setFoodQtyStr(data.foodAmount);
-      }
-    }
-
-    if (data.detectedTime) {
-      setFormTime(data.detectedTime);
-    }
-
-    setOcrStatus('done');
-    setOcrMessage(data.summary);
-    setOcrSubNote(data.note || '已自动填入识别结果，保存前请核对刻度与时间');
-  };
-
   const handlePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     // Reset input value so the user can retake or pick the same file again
     e.target.value = '';
     if (!file) return;
 
-    setOcrStatus('scanning');
-    setOcrMessage('正在读取所拍照片…');
-    setOcrSubNote('');
+    setPhotoStatus('loading');
+    setPhotoMessage('正在读取所选照片…');
+    setPhotoSubNote('');
 
     try {
       const processed = await processFeedingPhotoFile(file);
-      lastProcessedPhotoRef.current = processed;
       setCapturedPhotoUrl(processed.previewDataUrl);
       if (processed.exifTime) {
         setFormTime(processed.exifTime);
       }
-      await runPhotoRecognition(processed);
+      setPhotoStatus('ready');
+      setPhotoMessage('照片已附带，保存记录时会一并留存');
+      setPhotoSubNote(
+        processed.exifTime
+          ? `已自动读取拍摄时间 ${processed.exifTime}，请在下方核对奶量后保存`
+          : '可点击左侧缩略图放大核对奶瓶刻度，填写下方数值后保存'
+      );
     } catch (err) {
-      setOcrStatus('error');
-      setOcrMessage(
+      setPhotoStatus('error');
+      setPhotoMessage(
         err instanceof Error ? err.message : '读取照片失败，请重新拍照或换一张图片'
       );
-      setOcrSubNote('');
+      setPhotoSubNote('');
     }
   };
 
   const handleClearPhoto = () => {
     setCapturedPhotoUrl(null);
-    lastProcessedPhotoRef.current = null;
-    setOcrStatus('idle');
-    setOcrMessage('');
-    setOcrSubNote('');
+    setPhotoStatus('idle');
+    setPhotoMessage('');
+    setPhotoSubNote('');
   };
 
   const handleKeypadPress = (key: string) => {
@@ -553,7 +471,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
       {/* 3.3 帮助提示气泡 */}
       {mode === 'form' && showFormHelp && (
         <div className="relative z-20 mx-4 mb-2 rounded-[20px] border border-amber-200/30 bg-[#132552]/92 px-3.5 py-2.5 text-[11.5px] leading-relaxed text-amber-100/95 shadow-[0_10px_24px_rgba(3,8,24,0.4)] backdrop-blur-md">
-          <strong>源泉</strong>用于记录配方奶量，<strong>能量瓶</strong>用于母乳（支持瓶喂 ml 或亲喂时长），<strong>晨露</strong>用于辅食与维生素等营养品；点击上方「拍照识别」可快速填入刻度。
+          <strong>源泉</strong>用于记录配方奶量，<strong>能量瓶</strong>用于母乳（支持瓶喂 ml 或亲喂时长），<strong>晨露</strong>用于辅食与维生素等营养品；点击上方「拍照记录」可附带现场照片留档并读取拍摄时间。
         </div>
       )}
 
@@ -621,7 +539,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
             className="hidden"
           />
 
-          {/* 1. 顶部真实拍照识别卡片 + 真实识别状态反馈条 */}
+          {/* 1. 顶部本地拍照记录卡片 + 照片状态提示条 */}
           <div className="space-y-2">
             <div className="relative">
               {/* 左上角点缀发光小黄星 */}
@@ -666,7 +584,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                       <AssetSlot slotName="feed_ocr_camera" showSlotTag={showSlotTag} className="shrink-0">
                         <img
                           src="./assets/extracted/feed_icon_camera.png"
-                          alt="拍照识别"
+                          alt="拍照记录"
                           referrerPolicy="no-referrer"
                           className="h-10 w-11 object-contain"
                         />
@@ -685,12 +603,12 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                     className="min-w-0 flex-1 cursor-pointer"
                   >
                     <div className="text-[15px] font-bold leading-snug text-[#182848]">
-                      {capturedPhotoUrl ? '已拍摄照片' : '拍照识别'}
+                      {capturedPhotoUrl ? '已附带照片' : '拍照记录'}
                     </div>
                     <div className="truncate text-[11.5px] text-[#6d6256]">
                       {capturedPhotoUrl
                         ? '点击左侧缩略图可放大核对刻度'
-                        : '拍奶瓶刻度/辅食，自动识图填入'}
+                        : '拍奶瓶或辅食留档，本地保存'}
                     </div>
                   </div>
                 </div>
@@ -699,7 +617,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                 <div className="flex shrink-0 items-center gap-1.5">
                   <button
                     type="button"
-                    disabled={ocrStatus === 'scanning'}
+                    disabled={photoStatus === 'loading'}
                     onClick={() => cameraInputRef.current?.click()}
                     className="inline-flex items-center gap-1 rounded-full bg-gradient-to-b from-[#fde074] to-[#f4bd36] px-2.5 py-1.5 text-[12px] font-bold text-[#182848] shadow-[0_2px_8px_rgba(244,189,54,0.35)] transition-transform active:scale-95 disabled:opacity-60"
                   >
@@ -708,7 +626,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                   </button>
                   <button
                     type="button"
-                    disabled={ocrStatus === 'scanning'}
+                    disabled={photoStatus === 'loading'}
                     onClick={() => galleryInputRef.current?.click()}
                     className="inline-flex items-center gap-1 rounded-full border border-[#dfd1b5] bg-[#f7eedc] px-2.5 py-1.5 text-[12px] font-semibold text-[#4e463e] transition-transform active:scale-95 disabled:opacity-60"
                   >
@@ -719,86 +637,50 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
               </div>
             </div>
 
-            {/* 仅在真实拍照/选图后显示对应状态条，绝不伪造识别结果 */}
-            {ocrStatus !== 'idle' && (
+            {/* 仅在真实拍照/选图后显示本地处理反馈条 */}
+            {photoStatus !== 'idle' && (
               <div className="relative">
                 <div
                   className={`flex w-full items-start justify-between gap-2 rounded-[20px] border px-3.5 py-2.5 text-left shadow-[0_6px_16px_rgba(3,8,24,0.28)] transition-colors ${
-                    ocrStatus === 'scanning'
+                    photoStatus === 'loading'
                       ? 'border-amber-200 bg-amber-100/95 text-amber-950'
-                      : ocrStatus === 'done'
+                      : photoStatus === 'ready'
                       ? 'border-[#d8eab1] bg-gradient-to-r from-[#b9d98c] to-[#cce3a2] text-[#1c3917]'
-                      : ocrStatus === 'static_no_backend'
-                      ? 'border-sky-200/80 bg-[#e7f2ff]/95 text-[#183354]'
-                      : ocrStatus === 'not_recognized'
-                      ? 'border-amber-300/90 bg-[#fef3d6] text-[#5c3d0c]'
                       : 'border-rose-200 bg-[#fdeaea] text-[#6d1f26]'
                   }`}
                 >
                   <div className="flex min-w-0 flex-1 items-start gap-2">
                     <span
                       className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white shadow-2xs ${
-                        ocrStatus === 'scanning'
+                        photoStatus === 'loading'
                           ? 'bg-amber-500'
-                          : ocrStatus === 'done'
+                          : photoStatus === 'ready'
                           ? 'bg-[#3f8f33]'
-                          : ocrStatus === 'static_no_backend'
-                          ? 'bg-sky-600'
-                          : ocrStatus === 'not_recognized'
-                          ? 'bg-amber-600'
                           : 'bg-rose-500'
                       }`}
                     >
-                      {ocrStatus === 'scanning' ? (
+                      {photoStatus === 'loading' ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : ocrStatus === 'done' ? (
+                      ) : photoStatus === 'ready' ? (
                         <Check className="h-3.5 w-3.5 stroke-[3]" />
-                      ) : ocrStatus === 'static_no_backend' ? (
-                        <Camera className="h-3 w-3" />
                       ) : (
                         <AlertCircle className="h-3.5 w-3.5" />
                       )}
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="text-[12.5px] font-semibold leading-snug">
-                        {ocrMessage}
+                        {photoMessage}
                       </div>
-                      {ocrSubNote && (
+                      {photoSubNote && (
                         <div className="mt-0.5 text-[11px] leading-snug opacity-80">
-                          {ocrSubNote}
+                          {photoSubNote}
                         </div>
                       )}
                     </div>
                   </div>
-
-                  {ocrStatus === 'error' && lastProcessedPhotoRef.current && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (lastProcessedPhotoRef.current) {
-                          void runPhotoRecognition(lastProcessedPhotoRef.current);
-                        }
-                      }}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-bold text-[#6d1f26] shadow-2xs transition-transform active:scale-95"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      <span>重试</span>
-                    </button>
-                  )}
-
-                  {ocrStatus === 'not_recognized' && (
-                    <button
-                      type="button"
-                      onClick={() => cameraInputRef.current?.click()}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/20 px-2.5 py-1 text-[11px] font-bold text-[#5c3d0c] transition-transform active:scale-95"
-                    >
-                      <Camera className="h-3 w-3" />
-                      <span>重拍</span>
-                    </button>
-                  )}
                 </div>
 
-                {ocrStatus === 'done' && (
+                {photoStatus === 'ready' && (
                   <img
                     src="./assets/extracted/feed_glow_star.png"
                     alt=""
