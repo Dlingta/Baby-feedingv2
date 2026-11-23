@@ -16,6 +16,7 @@ import { PWAInstallButton } from './PWAInstallButton';
 
 interface HomeSettingsDrawerProps {
   open: boolean;
+  side?: 'left' | 'right';
   state: PlanetAppState;
   onClose: () => void;
   onNavigate: (tab: ModuleTab) => void;
@@ -23,6 +24,7 @@ interface HomeSettingsDrawerProps {
 
 export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
   open,
+  side = 'left',
   state,
   onClose,
   onNavigate,
@@ -38,10 +40,26 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
       ? '女宝'
       : '小星尘';
 
+  const shouldCloseForDelta = (dx: number, dy: number) => {
+    const horizontalEnough = Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2;
+    if (!horizontalEnough) return false;
+    return side === 'left' ? dx < -40 : dx > 40;
+  };
+
   const handleTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0];
     if (!t) return;
     dragStartRef.current = { x: t.clientX, y: t.clientY };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const start = dragStartRef.current;
+    const t = e.touches[0];
+    if (!start || !t) return;
+    if (shouldCloseForDelta(t.clientX - start.x, t.clientY - start.y)) {
+      dragStartRef.current = null;
+      onClose();
+    }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
@@ -49,10 +67,7 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
     dragStartRef.current = null;
     const t = e.changedTouches[0];
     if (!start || !t) return;
-    const dx = t.clientX - start.x;
-    const dy = t.clientY - start.y;
-    // 向右滑动收起抽屉
-    if (dx > 44 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+    if (shouldCloseForDelta(t.clientX - start.x, t.clientY - start.y)) {
       onClose();
     }
   };
@@ -67,9 +82,7 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
     const start = dragStartRef.current;
     dragStartRef.current = null;
     if (!start) return;
-    const dx = e.clientX - start.x;
-    const dy = e.clientY - start.y;
-    if (dx > 44 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+    if (shouldCloseForDelta(e.clientX - start.x, e.clientY - start.y)) {
       onClose();
     }
   };
@@ -78,6 +91,8 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
     onClose();
     onNavigate(tab);
   };
+
+  const isLeft = side === 'left';
 
   return (
     <div
@@ -95,16 +110,23 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
         className="absolute inset-0 h-full w-full bg-[#04091c]/62 backdrop-blur-[2px]"
       />
 
-      {/* 右侧滑出星际设置抽屉 */}
+      {/* 左侧或右侧滑出星际设置抽屉 */}
       <aside
         role="dialog"
         aria-label="星球设置侧栏"
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
-        className={`absolute inset-y-0 right-0 flex w-[80%] max-w-[308px] flex-col justify-between rounded-l-[24px] border-l border-white/15 bg-gradient-to-b from-[#112250] via-[#0c183c] to-[#08112b] px-4 pt-safe pb-safe shadow-[-16px_0_42px_rgba(2,6,20,0.75)] transition-transform duration-300 ease-out ${
-          open ? 'translate-x-0' : 'translate-x-full'
+        className={`absolute inset-y-0 flex w-[80%] max-w-[308px] flex-col justify-between bg-gradient-to-b from-[#112250] via-[#0c183c] to-[#08112b] px-4 pt-safe pb-safe transition-transform duration-300 ease-out ${
+          isLeft
+            ? `left-0 rounded-r-[24px] border-r border-white/15 shadow-[16px_0_42px_rgba(2,6,20,0.75)] ${
+                open ? 'translate-x-0' : '-translate-x-full'
+              }`
+            : `right-0 rounded-l-[24px] border-l border-white/15 shadow-[-16px_0_42px_rgba(2,6,20,0.75)] ${
+                open ? 'translate-x-0' : 'translate-x-full'
+              }`
         }`}
       >
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto no-scrollbar pt-2 pb-4">
@@ -219,7 +241,7 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
 
         {/* 底部手势提示 */}
         <div className="pt-2 text-center text-[11px] text-indigo-200/60">
-          向右滑动或点击空白处返回星球首页
+          {isLeft ? '向左滑动或点击空白处返回星球首页' : '向右滑动或点击空白处返回星球首页'}
         </div>
       </aside>
     </div>

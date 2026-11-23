@@ -18,7 +18,7 @@ interface HomeScreenProps {
   onNavigate: (tab: ModuleTab, subMode?: string) => void;
   onToggleChecklist: (id: string) => void;
   onQuickOpenVaccine: (dose: VaccineDose) => void;
-  onOpenSettingsDrawer: () => void;
+  onOpenSettingsDrawer: (side?: 'left' | 'right') => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -34,10 +34,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [todayDate, setTodayDate] = useState<string>(() => getTodayDateStr());
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
 
+  const checkAndTriggerSwipe = (dx: number, dy: number): boolean => {
+    if (Math.abs(dx) < 38) return false;
+    if (Math.abs(dx) <= Math.abs(dy) * 1.15) return false;
+    // 向右滑（从左侧拉出）打开左侧抽屉；向左滑（从右侧拉出）打开右侧抽屉
+    onOpenSettingsDrawer(dx > 0 ? 'left' : 'right');
+    return true;
+  };
+
   const handleSwipeTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0];
     if (!t) return;
     swipeStartRef.current = { x: t.clientX, y: t.clientY };
+  };
+
+  const handleSwipeTouchMove = (e: React.TouchEvent) => {
+    const start = swipeStartRef.current;
+    const t = e.touches[0];
+    if (!start || !t) return;
+    if (checkAndTriggerSwipe(t.clientX - start.x, t.clientY - start.y)) {
+      swipeStartRef.current = null;
+    }
   };
 
   const handleSwipeTouchEnd = (e: React.TouchEvent) => {
@@ -45,12 +62,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     swipeStartRef.current = null;
     const t = e.changedTouches[0];
     if (!start || !t) return;
-    const dx = t.clientX - start.x;
-    const dy = t.clientY - start.y;
-    // 左滑打开星际设置抽屉
-    if (dx < -48 && Math.abs(dx) > Math.abs(dy) * 1.3) {
-      onOpenSettingsDrawer();
-    }
+    checkAndTriggerSwipe(t.clientX - start.x, t.clientY - start.y);
   };
 
   const handleSwipePointerDown = (e: React.PointerEvent) => {
@@ -63,11 +75,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const start = swipeStartRef.current;
     swipeStartRef.current = null;
     if (!start) return;
-    const dx = e.clientX - start.x;
-    const dy = e.clientY - start.y;
-    if (dx < -48 && Math.abs(dx) > Math.abs(dy) * 1.3) {
-      onOpenSettingsDrawer();
-    }
+    checkAndTriggerSwipe(e.clientX - start.x, e.clientY - start.y);
   };
 
   useEffect(() => {
@@ -115,6 +123,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <div
         style={{ minHeight: 'var(--app-viewport-h)' }}
         onTouchStart={handleSwipeTouchStart}
+        onTouchMove={handleSwipeTouchMove}
         onTouchEnd={handleSwipeTouchEnd}
         onPointerDown={handleSwipePointerDown}
         onPointerUp={handleSwipePointerUp}
@@ -152,20 +161,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   return (
     <div
       onTouchStart={handleSwipeTouchStart}
+      onTouchMove={handleSwipeTouchMove}
       onTouchEnd={handleSwipeTouchEnd}
       onPointerDown={handleSwipePointerDown}
       onPointerUp={handleSwipePointerUp}
       className="relative flex w-full min-w-0 max-w-full flex-col overflow-x-clip pb-6"
     >
       {/* =================================================================
-          首屏独立视口容器：严格锁定为 --app-viewport-h，确保下滑板块（早教清单）不局部露出
+          首屏独立视口容器：严格锁定为 --app-viewport-h，并在 iPhone 15 Pro Max 等修长屏幕上自然舒展铺满
          ================================================================= */}
       <section
         style={{ minHeight: 'var(--app-viewport-h)' }}
-        className="relative flex w-full min-w-0 flex-col justify-start overflow-hidden bg-[#091535] pt-[env(safe-area-inset-top,0px)] select-none"
+        className="relative flex w-full min-w-0 flex-col justify-between overflow-hidden bg-[#091535] pt-[env(safe-area-inset-top,0px)] pb-3 select-none"
         aria-label="星球主视觉"
       >
-        <div className="relative w-full aspect-[941/1490] shrink-0 overflow-hidden select-none">
+        <div className="relative w-full aspect-[941/1490] -mb-[17.5%] shrink-0 overflow-hidden select-none">
         {/* Layer 1: 宇宙星空背景 (顶部星星、左侧土星、右上发光大星星；渐隐原图底部地球防重影) */}
         <img
           src="./assets/aistudio/____f8d9ecf9.png"
@@ -247,13 +257,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* 底部自然渐隐至星空底色 */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-gradient-to-t from-[#091535] via-[#091535]/50 to-transparent" />
 
-        {/* 右侧极轻星光边缘把手：左滑首页任意区域或轻触此微光把手均可呼出设置抽屉，不破坏主画面构图 */}
+        {/* 左侧与右侧轻星光边缘把手：左右侧滑首页或轻触边缘把手均可随时呼出星际设置抽屉 */}
         <button
           type="button"
-          onClick={onOpenSettingsDrawer}
-          aria-label="左滑或点击打开设置抽屉"
+          onClick={() => onOpenSettingsDrawer('left')}
+          aria-label="从左侧滑出或点击打开设置抽屉"
+          title="右侧滑打开设置"
+          className="absolute left-0 top-[44%] z-40 flex h-14 w-5 items-center justify-center rounded-r-[14px] border border-l-0 border-amber-200/30 bg-[#12224d]/52 text-amber-100/80 backdrop-blur-sm shadow-[4px_0_14px_rgba(3,8,24,0.35)] transition-all hover:w-6 hover:bg-[#1a3069]/75 hover:text-amber-200 active:scale-95"
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onOpenSettingsDrawer('right')}
+          aria-label="向左滑动或点击打开设置抽屉"
           title="左滑打开设置"
-          className="absolute right-0 top-[44%] z-40 flex h-14 w-5 items-center justify-center rounded-l-[14px] border border-r-0 border-amber-200/25 bg-[#12224d]/45 text-amber-100/75 backdrop-blur-sm shadow-[-4px_0_14px_rgba(3,8,24,0.35)] transition-all hover:w-6 hover:bg-[#1a3069]/75 hover:text-amber-200 active:scale-95"
+          className="absolute right-0 top-[44%] z-40 flex h-14 w-5 items-center justify-center rounded-l-[14px] border border-r-0 border-amber-200/30 bg-[#12224d]/52 text-amber-100/80 backdrop-blur-sm shadow-[-4px_0_14px_rgba(3,8,24,0.35)] transition-all hover:w-6 hover:bg-[#1a3069]/75 hover:text-amber-200 active:scale-95"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
         </button>
@@ -437,8 +457,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           />
         </svg>
 
-        {/* Layer 8: 底部米白色撕纸摘要卡片 (实装上传手绘底图 + 动态可点数据) */}
-        <div className="absolute inset-x-3 bottom-[2.2%] z-30">
+        </div>
+
+        {/* Layer 8: 底部米白色撕纸摘要卡片 (独立于插画容器底部，在修长手机屏幕上自然贴合底部导航栏) */}
+        <div className="relative z-30 mt-auto px-3 pt-1">
           <AssetSlot slotName="paper_summary_card" showSlotTag={showSlotTag}>
             <div className="relative w-full select-none">
               <img
@@ -503,7 +525,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </div>
             </div>
           </AssetSlot>
-        </div>
         </div>
       </section>
 

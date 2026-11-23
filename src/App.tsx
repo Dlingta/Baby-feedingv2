@@ -192,6 +192,7 @@ export default function App() {
   const [showSlotTag, setShowSlotTag] = useState(false);
   const [previewWidth, setPreviewWidth] = useState<PreviewWidthPreset>(390);
   const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
+  const [settingsDrawerSide, setSettingsDrawerSide] = useState<'left' | 'right'>('left');
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
 
   // 实时同步滚动视口高度到 --app-viewport-h，确保首屏严格满屏且不露出下一板块局部内容
@@ -388,6 +389,14 @@ export default function App() {
     }));
   };
 
+  const handleAddFeedings = (records: FeedingRecord[]) => {
+    if (records.length === 0) return;
+    setState((prev) => ({
+      ...prev,
+      feedings: [...records, ...prev.feedings],
+    }));
+  };
+
   const handleDeleteFeeding = (id: string) => {
     setState((prev) => ({
       ...prev,
@@ -524,7 +533,7 @@ export default function App() {
   const currentScreenCode = getCurrentScreenCode();
 
   return (
-    <div className="flex min-h-[100dvh] w-full max-w-full overflow-x-clip bg-[#050b1c] text-slate-100">
+    <div className="fixed inset-0 flex h-full w-full max-w-full overflow-hidden bg-[#050b1c] text-slate-100 lg:static lg:min-h-[100dvh] lg:overflow-x-clip">
       {/* 桌面端 16 页原型状态索引侧栏 */}
       <PrototypeSidebar
         activeScreen={currentScreenCode}
@@ -536,10 +545,10 @@ export default function App() {
         onResetDemo={handleResetDemo}
       />
 
-      {/* 主画布区：375/390/430px 移动端全屏适配，桌面端居中呈现 9:16 手机交互画布 */}
-      <main className="flex min-w-0 max-w-full flex-1 items-center justify-center overflow-x-clip lg:p-5">
+      {/* 主画布区：iPhone/移动端 100% 铺满物理屏幕无底部留白，桌面端居中呈现 9:16 手机交互画布 */}
+      <main className="flex h-full min-w-0 max-w-full flex-1 items-stretch justify-center overflow-hidden lg:h-auto lg:items-center lg:p-5">
         <div
-          className={`relative flex h-[100dvh] w-full min-w-0 max-w-[430px] flex-col overflow-hidden cosmic-canvas transition-[width,height] duration-200 ${PREVIEW_FRAME_CLASS[previewWidth]} lg:max-w-none lg:max-h-[calc(100dvh-2.5rem)] lg:rounded-[40px] lg:border-[6px] lg:border-[#1c2c58] lg:shadow-[0_28px_80px_rgba(0,0,0,0.75)]`}
+          className={`relative flex h-full w-full min-w-0 max-w-[430px] flex-col overflow-hidden cosmic-canvas transition-[width,height] duration-200 ${PREVIEW_FRAME_CLASS[previewWidth]} lg:max-w-none lg:max-h-[calc(100dvh-2.5rem)] lg:rounded-[40px] lg:border-[6px] lg:border-[#1c2c58] lg:shadow-[0_28px_80px_rgba(0,0,0,0.75)]`}
         >
           <OfflineIndicator />
           {/* 垂直滚动内容区（严禁横向溢出） */}
@@ -555,7 +564,10 @@ export default function App() {
                 onNavigate={handleNavigateTab}
                 onToggleChecklist={handleToggleChecklist}
                 onQuickOpenVaccine={handleQuickOpenVaccine}
-                onOpenSettingsDrawer={() => setIsSettingsDrawerOpen(true)}
+                onOpenSettingsDrawer={(side = 'left') => {
+                  setSettingsDrawerSide(side);
+                  setIsSettingsDrawerOpen(true);
+                }}
               />
             )}
 
@@ -579,6 +591,7 @@ export default function App() {
                 onChangeMode={setFeedingMode}
                 onBackHome={() => handleNavigateTab('home')}
                 onAddFeeding={handleAddFeeding}
+                onAddFeedings={handleAddFeedings}
                 onDeleteFeeding={handleDeleteFeeding}
               />
             )}
@@ -637,9 +650,10 @@ export default function App() {
               showSlotTag={showSlotTag}
             />
           )}
-          {/* 首页左滑呼出的星际设置抽屉（严格约束在手机视口框架内，不破坏首页排版） */}
+          {/* 首页侧滑呼出的星际设置抽屉（支持从左侧或右侧呼出，严格约束在手机视口框架内） */}
           <HomeSettingsDrawer
             open={isSettingsDrawerOpen && activeTab === 'home'}
+            side={settingsDrawerSide}
             state={state}
             onClose={() => setIsSettingsDrawerOpen(false)}
             onNavigate={handleNavigateTab}
