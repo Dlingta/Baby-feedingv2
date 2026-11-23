@@ -57,6 +57,7 @@ export interface FeedingRecord {
   foodName?: string;
   foodAmount?: string;
   note?: string;
+  photoUrl?: string;
   recorder: string;
 }
 
