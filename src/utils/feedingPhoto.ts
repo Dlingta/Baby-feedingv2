@@ -233,14 +233,36 @@ export async function processFeedingPhotoFile(file: File): Promise<ProcessedFeed
 }
 
 /**
- * Runs 100% browser-local WebAssembly OCR (Tesseract.js, self-hosted models)
- * on a photographed paper feeding log. Makes ZERO Gemini API or external network calls.
+ * Runs 100% on-device offline OCR on a photographed paper feeding log:
+ * - Inside native iOS App: uses Apple Vision framework (VNRecognizeTextRequest, Neural Engine, ~200ms)
+ * - In browser preview: falls back seamlessly to self-hosted Tesseract.js WebAssembly OCR
+ * Makes ZERO Gemini API or external cloud calls.
  */
 export async function recognizeFeedingPhotoLocally(
   photo: ProcessedFeedingPhoto,
   fallbackTime: string,
   onProgress?: (progress: LocalOcrProgress) => void
 ): Promise<LocalOcrResult> {
+  // 1. iOS 原生 App 下优先调用苹果 Vision 框架（端侧神经网络引擎，速度快、手写中文识别率高）
+  const nativeVisionResult = await (async () => {
+    const { isNativeIOSApp, visionOcrBridge } = await import('../native/iosBridge');
+    if (!isNativeIOSApp()) return null;
+    onProgress?.({ stage: '正在使用 Apple Vision 离线识别纸质记录…', percent: 35 });
+    return visionOcrBridge.recognizeText(photo.previewDataUrl);
+  })();
+
+  if (nativeVisionResult) {
+    const rawText = (nativeVisionResult.text || '').trim();
+    const drafts = parseFeedingOcrText(rawText, photo.exifTime || fallbackTime);
+    onProgress?.({ stage: 'Apple Vision 识别完成', percent: 100 });
+    return {
+      rawText,
+      confidence: nativeVisionResult.confidence,
+      drafts,
+    };
+  }
+
+  // 2. 网页预览环境兜底：本地离线 Tesseract.js WASM 识别
   activeProgressCallback = onProgress || null;
   onProgress?.({ stage: '正在启动本地离线文字识别…', percent: 8 });
 

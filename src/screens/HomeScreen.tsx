@@ -18,7 +18,7 @@ interface HomeScreenProps {
   onNavigate: (tab: ModuleTab, subMode?: string) => void;
   onToggleChecklist: (id: string) => void;
   onQuickOpenVaccine: (dose: VaccineDose) => void;
-  onOpenSettingsDrawer: (side?: 'left' | 'right') => void;
+  onOpenSettingsDrawer: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -35,10 +35,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const checkAndTriggerSwipe = (dx: number, dy: number): boolean => {
-    if (Math.abs(dx) < 38) return false;
+    if (dx > -38) return false;
     if (Math.abs(dx) <= Math.abs(dy) * 1.15) return false;
-    // 向右滑（从左侧拉出）打开左侧抽屉；向左滑（从右侧拉出）打开右侧抽屉
-    onOpenSettingsDrawer(dx > 0 ? 'left' : 'right');
+    // 向左滑动呼出右侧星际设置抽屉（避免与 iOS 系统左侧边缘返回手势冲突）
+    onOpenSettingsDrawer();
     return true;
   };
 
@@ -293,20 +293,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* 底部自然渐隐至星空底色 */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-gradient-to-t from-[#091535] via-[#091535]/50 to-transparent" />
 
-        {/* 左侧与右侧轻星光边缘把手：左右侧滑首页或轻触边缘把手均可随时呼出星际设置抽屉 */}
+        {/* 右侧轻星光边缘把手：左滑首页或轻触边缘把手即可呼出星际设置抽屉 */}
         <button
           type="button"
-          onClick={() => onOpenSettingsDrawer('left')}
-          aria-label="从左侧滑出或点击打开设置抽屉"
-          title="右侧滑打开设置"
-          className="absolute left-0 top-[44%] z-40 flex h-14 w-5 items-center justify-center rounded-r-[14px] border border-l-0 border-amber-200/30 bg-[#12224d]/52 text-amber-100/80 backdrop-blur-sm shadow-[4px_0_14px_rgba(3,8,24,0.35)] transition-all hover:w-6 hover:bg-[#1a3069]/75 hover:text-amber-200 active:scale-95"
-        >
-          <ChevronRight className="h-3.5 w-3.5" />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onOpenSettingsDrawer('right')}
+          onClick={onOpenSettingsDrawer}
           aria-label="向左滑动或点击打开设置抽屉"
           title="左滑打开设置"
           className="absolute right-0 top-[44%] z-40 flex h-14 w-5 items-center justify-center rounded-l-[14px] border border-r-0 border-amber-200/30 bg-[#12224d]/52 text-amber-100/80 backdrop-blur-sm shadow-[-4px_0_14px_rgba(3,8,24,0.35)] transition-all hover:w-6 hover:bg-[#1a3069]/75 hover:text-amber-200 active:scale-95"

@@ -1,15 +1,12 @@
 import { useEffect } from 'react';
+import { isNativeIOSApp } from '../native/iosBridge';
 
 /**
- * 跨机型 iPhone / iOS PWA 视口高度与安全区动态适配 Hook
+ * 跨机型 iPhone / iOS 原生 App & PWA 视口高度与安全区动态适配 Hook
  *
- * 解决两个经典 iOS WebKit Standalone PWA（black-translucent + viewport-fit=cover）难题：
- * 1. 底部空隙（Bottom Chin）：iOS 独立主屏模式下，WebKit 会把 100vh / 100dvh / height:100% / fixed inset-0
- *    截断为 `screen.height - safeAreaTop`（如 iPhone 15 Pro Max 上 932 - 59 = 873pt），导致底部导航栏悬空。
- *    通过动态比对逻辑屏幕尺寸与 innerHeight，精确还原全屏高度 `--app-shell-h`，适配所有 iPhone 机型。
- * 2. 灵动岛 / 刘海顶部阴影避让：实时探测真实 CSS `env(safe-area-inset-top)` 与 `env(safe-area-inset-bottom)`
- *    （含 iOS 冷启动延迟重试与兜底识别），按硬件顶部遮挡高度分级计算 `--header-top-pad` 与 `--bottom-nav-pad`，
- *    确保从 iPhone SE、刘海屏（X~14）到灵动岛（14 Pro / 15 / 16 全系）及桌面预览均呈现舒适比例。
+ * 1. 原生 iOS App（Capacitor WKWebView, contentInset: never）：直接沿用 UIKit 精确的物理屏高与安全区；
+ * 2. iOS 独立主屏 PWA（black-translucent + viewport-fit=cover）：修正 WebKit 截断高度导致的底部空带；
+ * 3. 灵动岛 / 刘海顶部阴影避让：实时探测 env(safe-area-inset-top/bottom)（含冷启动兜底），按机型分级留白。
  */
 export function useViewportSafeArea(): void {
   useEffect(() => {
@@ -17,7 +14,7 @@ export function useViewportSafeArea(): void {
 
     const root = document.documentElement;
 
-    // 隐藏探针：实时读取浏览器解析后的 env(safe-area-inset-*) 实际像素值
+    // 隐藏探针：实时读取浏览器/WKWebView 解析后的 env(safe-area-inset-*) 实际像素值
     const probe = document.createElement('div');
     probe.setAttribute('aria-hidden', 'true');
     probe.style.cssText = [
@@ -34,6 +31,7 @@ export function useViewportSafeArea(): void {
     document.body.appendChild(probe);
 
     const detectIOS = (): boolean => {
+      if (isNativeIOSApp()) return true;
       const ua = navigator.userAgent || '';
       return (
         /iPad|iPhone|iPod/.test(ua) ||
@@ -42,6 +40,7 @@ export function useViewportSafeArea(): void {
     };
 
     const detectStandalone = (): boolean => {
+      if (isNativeIOSApp()) return true;
       const nav = navigator as Navigator & { standalone?: boolean };
       return (
         nav.standalone === true ||
@@ -51,6 +50,7 @@ export function useViewportSafeArea(): void {
     };
 
     const syncMetrics = () => {
+      const nativeIOS = isNativeIOSApp();
       const isIOS = detectIOS();
       const isStandalone = detectStandalone();
       const isMobileLayout = window.innerWidth < 1024;
@@ -68,9 +68,9 @@ export function useViewportSafeArea(): void {
       const screenShort = Math.min(window.screen.height, window.screen.width);
       const physicalTargetH = isPortrait ? screenLong : screenShort;
 
-      // 仅在 iOS 独立 PWA 模式下修正 WebKit black-translucent 的视口高度截断
       const statusGap = physicalTargetH - innerH;
       const hasWebkitStandaloneGap =
+        !nativeIOS &&
         isIOS &&
         isStandalone &&
         isMobileLayout &&
@@ -78,13 +78,21 @@ export function useViewportSafeArea(): void {
         statusGap > 0 &&
         statusGap <= 120;
 
-      if (isIOS && isStandalone && isMobileLayout) {
+      if (nativeIOS && isMobileLayout) {
+        // 原生 iOS App（Capacitor WKWebView）直接铺满物理窗口
+        root.style.setProperty('--app-shell-h', `${innerH > 0 ? innerH : physicalTargetH}px`);
+      } else if (isIOS && isStandalone && isMobileLayout) {
         const resolvedShellH = hasWebkitStandaloneGap ? physicalTargetH : innerH;
         if (resolvedShellH > 0) {
           root.style.setProperty('--app-shell-h', `${resolvedShellH}px`);
         }
+      } else {
+        // 普通移动浏览器（含 Safari 地址栏）与桌面端交由原生 100dvh 管理
+        root.style.removeProperty('--app-shell-h');
+      }
 
-        // 若 iOS 冷启动阶段 env(safe-area-inset-top) 暂时返回 0，按真实视口差值或屏幕规格分级兜底
+      if (isIOS && isStandalone && isMobileLayout) {
+        // 若冷启动阶段 env(safe-area-inset-top) 暂时返回 0，按真实视口差值或屏幕规格分级兜底
         if (safeTop < 1 && isPortrait) {
           if (hasWebkitStandaloneGap && statusGap >= 18 && statusGap <= 80) {
             safeTop = statusGap;
@@ -102,9 +110,6 @@ export function useViewportSafeArea(): void {
         if (safeBottom < 1 && isPortrait && screenLong >= 812) {
           safeBottom = 34; // 全面屏 iPhone 底部 Home Indicator
         }
-      } else {
-        // 普通移动浏览器（含 Safari 地址栏）与桌面端交由原生 100dvh 管理，避免遮挡浏览器工具栏
-        root.style.removeProperty('--app-shell-h');
       }
 
       // 按顶部硬件区域高度自适应留白：

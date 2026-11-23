@@ -42,6 +42,7 @@ export interface DiaryEntry {
   weather: DiaryWeather;
   recorder: string;
   photos: string[];
+  updatedAt?: string;
 }
 
 export type FeedingType = 'breast' | 'formula' | 'solids' | 'supplement';
@@ -59,6 +60,7 @@ export interface FeedingRecord {
   note?: string;
   photoUrl?: string;
   recorder: string;
+  updatedAt?: string;
 }
 
 export type GrowthMeasurementMethod = 'recumbent' | 'standing';
@@ -72,6 +74,7 @@ export interface GrowthRecord {
   measurementMethod?: GrowthMeasurementMethod;
   note: string;
   isDemo?: boolean;
+  recorder?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -92,6 +95,7 @@ export interface VaccineDose {
   brandOrigin?: VaccineBrandOrigin;
   fundingType?: VaccineFundingType;
   note?: string;
+  updatedAt?: string;
 }
 
 export type IllnessCareCategory = 'temperature' | 'medicine' | 'hydration';
@@ -123,6 +127,7 @@ export interface IllnessRecord {
   diagnosis?: string;
   casePhotos?: string[];
   recorder: string;
+  updatedAt?: string;
 }
 
 export interface ChecklistItem {
@@ -130,6 +135,22 @@ export interface ChecklistItem {
   title: string;
   subtitle: string;
   completed: boolean;
+  updatedAt?: string;
+}
+
+export interface CoPilotParticipant {
+  id: string;
+  name: string;
+  role: 'owner' | 'coPilot';
+  status: 'accepted' | 'pending' | 'removed' | 'unknown';
+}
+
+export interface PlanetSyncMeta {
+  schemaVersion: number;
+  updatedAt: string;
+  updatedBy?: string;
+  /** 记录已删除条目的 ID -> 删除时间，防止多台 iPhone 离线合并时已删记录“复活” */
+  deletedIds?: Record<string, string>;
 }
 
 export interface PlanetAppState {
@@ -140,4 +161,5 @@ export interface PlanetAppState {
   vaccines: VaccineDose[];
   illnesses: IllnessRecord[];
   checklist: ChecklistItem[];
+  syncMeta?: PlanetSyncMeta;
 }

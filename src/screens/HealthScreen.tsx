@@ -32,6 +32,7 @@ export type HealthViewMode = 'vaccine' | 'vaccine_sheet' | 'illness' | 'illness_
 
 interface HealthScreenProps {
   state: PlanetAppState;
+  currentRecorder: string;
   mode: HealthViewMode;
   activeSheetDoseId?: string | null;
   showSlotTag?: boolean;
@@ -131,6 +132,7 @@ function getDiseaseIconSrc(rec: IllnessRecord): string {
 
 export const HealthScreen: React.FC<HealthScreenProps> = ({
   state,
+  currentRecorder,
   mode,
   activeSheetDoseId,
   showSlotTag = false,
@@ -179,7 +181,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
   const [diagnosis, setDiagnosis] = useState('');
   const [casePhotos, setCasePhotos] = useState<string[]>([]);
   const [illHandled, setIllHandled] = useState(false);
-  const [recorder, setRecorder] = useState(state.profile.recorders[0] || '妈妈');
+  const [recorder, setRecorder] = useState(currentRecorder || state.profile.recorders[0] || '妈妈');
   const casePhotoInputRef = useRef<HTMLInputElement>(null);
 
   // 当从首页“去打卡”或侧栏直达 5.2 时，同步预填选中疫苗信息
@@ -255,7 +257,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
     setDiagnosis('');
     setCasePhotos([]);
     setIllHandled(false);
-    setRecorder(state.profile.recorders[0] || '妈妈');
+    setRecorder(currentRecorder || state.profile.recorders[0] || '妈妈');
     setShowFormTimeRow(false);
     setShowHeaderPanel(false);
     onChangeMode('illness_form');
@@ -276,7 +278,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
     setDiagnosis(rec.diagnosis || '');
     setCasePhotos(rec.casePhotos || []);
     setIllHandled(Boolean(rec.handled));
-    setRecorder(rec.recorder || state.profile.recorders[0] || '妈妈');
+    setRecorder(rec.recorder || currentRecorder || state.profile.recorders[0] || '妈妈');
     setShowFormTimeRow(false);
     setShowHeaderPanel(false);
     onChangeMode('illness_form');

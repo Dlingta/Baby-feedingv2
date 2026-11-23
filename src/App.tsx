@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   BabyProfile,
+  CoPilotParticipant,
   DiaryEntry,
   FeedingRecord,
   GrowthRecord,
@@ -24,8 +25,18 @@ import { HealthScreen, HealthViewMode } from './screens/HealthScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { OfflineIndicator } from './components/PWAInstallButton';
 import { useViewportSafeArea } from './hooks/useViewportSafeArea';
+import {
+  CloudKitAccountStatus,
+  cloudKitBridge,
+  hapticSuccess,
+  hapticTap,
+  initNativeIOSChrome,
+  isNativeIOSApp,
+} from './native/iosBridge';
+import { mergePlanetStates } from './utils/stateMerge';
 
 const STORAGE_KEY = 'planet_feeding_prototype_state_v1';
+const DEVICE_RECORDER_KEY = 'planet_device_recorder_v1';
 
 // 9:16 移动端预览尺寸映射（内框净尺寸 375×667 / 390×694 / 430×764，外加桌面边框 12px）
 const PREVIEW_FRAME_CLASS: Record<PreviewWidthPreset, string> = {
@@ -195,8 +206,51 @@ export default function App() {
   const [showSlotTag, setShowSlotTag] = useState(false);
   const [previewWidth, setPreviewWidth] = useState<PreviewWidthPreset>(390);
   const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
-  const [settingsDrawerSide, setSettingsDrawerSide] = useState<'left' | 'right'>('left');
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
+
+  // 每台 iPhone 独立保存「本机默认喂养人」身份（不随 iCloud 数据同步被覆盖）
+  const [currentRecorder, setCurrentRecorder] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(DEVICE_RECORDER_KEY);
+      if (saved && saved.trim()) return saved.trim();
+    } catch {
+      // ignore
+    }
+    return state.profile.recorders[0] || '妈妈';
+  });
+
+  // Apple Native CloudKit 家庭共享状态
+  const [cloudStatus, setCloudStatus] = useState<CloudKitAccountStatus>({
+    available: false,
+    status: isNativeIOSApp() ? 'couldNotDetermine' : 'webPreview',
+    role: 'owner',
+    userRecordId: '',
+  });
+  const [coPilots, setCoPilots] = useState<CoPilotParticipant[]>([]);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const suppressNextPushRef = useRef(false);
+  const cloudReadyRef = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DEVICE_RECORDER_KEY, currentRecorder);
+    } catch {
+      // ignore
+    }
+  }, [currentRecorder]);
+
+  // 确保本机身份仍在家庭记录人名单中
+  useEffect(() => {
+    if (
+      state.profile.recorders.length > 0 &&
+      !state.profile.recorders.includes(currentRecorder)
+    ) {
+      setCurrentRecorder(state.profile.recorders[0]);
+    }
+  }, [state.profile.recorders, currentRecorder]);
 
   // 实时同步滚动视口高度到 --app-viewport-h，确保首屏严格满屏且不露出下一板块局部内容
   useEffect(() => {
@@ -239,6 +293,87 @@ export default function App() {
       // ignore storage quota errors
     }
   }, [state]);
+
+  // 原生 iOS App 启动初始化：状态栏样式 + CloudKit 静默检查、拉取与推送订阅
+  useEffect(() => {
+    void initNativeIOSChrome();
+    if (!isNativeIOSApp()) return;
+
+    let unsubRemote = () => {};
+    let cancelled = false;
+
+    const pullAndRefresh = async () => {
+      setIsSyncingCloud(true);
+      try {
+        const status = await cloudKitBridge.getAccountStatus();
+        if (cancelled) return;
+        setCloudStatus(status);
+        cloudReadyRef.current = status.available;
+
+        if (!status.available) return;
+
+        const [pulled, participantRes] = await Promise.all([
+          cloudKitBridge.pullLatest(),
+          cloudKitBridge.getParticipants(),
+        ]);
+        if (cancelled) return;
+        setCoPilots(participantRes.participants || []);
+
+        if (pulled.found && pulled.state) {
+          suppressNextPushRef.current = true;
+          setState((prev) => mergePlanetStates(prev, normalizeStateAssetPaths(pulled.state!)).state);
+          setLastSyncedAt(new Date().toISOString());
+        }
+      } catch {
+        // silent offline resilience
+      } finally {
+        if (!cancelled) setIsSyncingCloud(false);
+      }
+    };
+
+    void (async () => {
+      await pullAndRefresh();
+      await cloudKitBridge.registerSubscriptions();
+      unsubRemote = await cloudKitBridge.onRemoteUpdate(() => {
+        void pullAndRefresh();
+      });
+    })();
+
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void pullAndRefresh();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisible);
+
+    return () => {
+      cancelled = true;
+      unsubRemote();
+      document.removeEventListener('visibilitychange', handleVisible);
+    };
+  }, []);
+
+  // 原生 iOS App 下本地数据发生变更时，防抖静默推送到私人/共享 iCloud
+  useEffect(() => {
+    if (!isNativeIOSApp() || !cloudReadyRef.current) return;
+    if (suppressNextPushRef.current) {
+      suppressNextPushRef.current = false;
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void cloudKitBridge
+        .pushSnapshot(stateRef.current, currentRecorder)
+        .then((res) => {
+          if (res.synced) {
+            setLastSyncedAt(res.updatedAt || new Date().toISOString());
+          }
+        })
+        .catch(() => {});
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, [state, currentRecorder]);
 
   // 计算当前处于 15 个设计视图中的哪一个编号
   const getCurrentScreenCode = (): ScreenCode => {
@@ -344,6 +479,7 @@ export default function App() {
   };
 
   const handleNavigateTab = (tab: ModuleTab) => {
+    hapticTap();
     setHomeForceEmpty(false);
     setActiveTab(tab);
     if (tab === 'diary') {
@@ -362,72 +498,123 @@ export default function App() {
     }
   };
 
-  // 数据修改 Handlers
+  const stampMeta = (
+    prev: PlanetAppState,
+    deletedId?: string
+  ): PlanetAppState['syncMeta'] => {
+    const now = new Date().toISOString();
+    const deletedIds = { ...(prev.syncMeta?.deletedIds || {}) };
+    if (deletedId) {
+      deletedIds[deletedId] = now;
+    }
+    return {
+      schemaVersion: 2,
+      updatedAt: now,
+      updatedBy: currentRecorder,
+      deletedIds,
+    };
+  };
+
+  // 数据修改 Handlers（统一记录 updatedAt 与删除墓碑，保障多台 iPhone 离线合并安全）
   const handleToggleChecklist = (id: string) => {
+    hapticTap();
+    const now = new Date().toISOString();
     setState((prev) => ({
       ...prev,
       checklist: prev.checklist.map((item) =>
-        item.id === id ? { ...item, completed: !item.completed } : item
+        item.id === id ? { ...item, completed: !item.completed, updatedAt: now } : item
       ),
+      syncMeta: stampMeta(prev),
     }));
   };
 
   const handleSaveDiary = (entry: DiaryEntry) => {
+    hapticSuccess();
+    const stamped: DiaryEntry = { ...entry, updatedAt: new Date().toISOString() };
     setState((prev) => {
-      const exists = prev.diaries.some((d) => d.id === entry.id);
+      const exists = prev.diaries.some((d) => d.id === stamped.id);
       const nextDiaries = exists
-        ? prev.diaries.map((d) => (d.id === entry.id ? entry : d))
-        : [entry, ...prev.diaries];
-      return { ...prev, diaries: nextDiaries };
+        ? prev.diaries.map((d) => (d.id === stamped.id ? stamped : d))
+        : [stamped, ...prev.diaries];
+      return { ...prev, diaries: nextDiaries, syncMeta: stampMeta(prev) };
     });
   };
 
   const handleDeleteDiary = (id: string) => {
+    hapticTap();
     setState((prev) => ({
       ...prev,
       diaries: prev.diaries.filter((d) => d.id !== id),
+      syncMeta: stampMeta(prev, id),
     }));
   };
 
   const handleAddFeeding = (record: FeedingRecord) => {
+    hapticSuccess();
+    const stamped: FeedingRecord = {
+      ...record,
+      recorder: record.recorder || currentRecorder,
+      updatedAt: new Date().toISOString(),
+    };
     setState((prev) => ({
       ...prev,
-      feedings: [record, ...prev.feedings],
+      feedings: [stamped, ...prev.feedings],
+      syncMeta: stampMeta(prev),
     }));
   };
 
   const handleAddFeedings = (records: FeedingRecord[]) => {
     if (records.length === 0) return;
+    hapticSuccess();
+    const now = new Date().toISOString();
+    const stamped = records.map((r) => ({
+      ...r,
+      recorder: r.recorder || currentRecorder,
+      updatedAt: now,
+    }));
     setState((prev) => ({
       ...prev,
-      feedings: [...records, ...prev.feedings],
+      feedings: [...stamped, ...prev.feedings],
+      syncMeta: stampMeta(prev),
     }));
   };
 
   const handleDeleteFeeding = (id: string) => {
+    hapticTap();
     setState((prev) => ({
       ...prev,
       feedings: prev.feedings.filter((f) => f.id !== id),
+      syncMeta: stampMeta(prev, id),
     }));
   };
 
   const handleSaveGrowth = (record: GrowthRecord) => {
+    hapticSuccess();
+    const now = new Date().toISOString();
+    const stamped: GrowthRecord = {
+      ...record,
+      recorder: record.recorder || currentRecorder,
+      updatedAt: now,
+    };
     setState((prev) => {
-      const exists = prev.growths.some((g) => g.id === record.id);
+      const exists = prev.growths.some((g) => g.id === stamped.id);
       const nextGrowths = exists
-        ? prev.growths.map((g) => (g.id === record.id ? record : g))
-        : [...prev.growths, record];
+        ? prev.growths.map((g) => (g.id === stamped.id ? stamped : g))
+        : [...prev.growths, stamped];
       return {
         ...prev,
         growths: nextGrowths.sort((a, b) => a.date.localeCompare(b.date)),
+        syncMeta: stampMeta(prev),
       };
     });
   };
 
   const handleDeleteGrowth = (id: string) => {
+    hapticTap();
     setState((prev) => ({
       ...prev,
       growths: prev.growths.filter((g) => g.id !== id),
+      syncMeta: stampMeta(prev, id),
     }));
   };
 
@@ -438,6 +625,8 @@ export default function App() {
     brandOrigin?: VaccineBrandOrigin,
     fundingType?: VaccineFundingType
   ) => {
+    hapticSuccess();
+    const now = new Date().toISOString();
     setState((prev) => {
       const updated = prev.vaccines.map((v) =>
         v.id === doseId
@@ -448,6 +637,7 @@ export default function App() {
               brandOrigin: brandOrigin || v.brandOrigin || '国产',
               fundingType: fundingType || v.fundingType || '免费',
               note,
+              updatedAt: now,
             }
           : v
       );
@@ -459,11 +649,13 @@ export default function App() {
           updated[firstLockedIdx] = { ...updated[firstLockedIdx], status: 'next' };
         }
       }
-      return { ...prev, vaccines: updated };
+      return { ...prev, vaccines: updated, syncMeta: stampMeta(prev) };
     });
   };
 
   const handleResetVaccine = (doseId: string) => {
+    hapticTap();
+    const now = new Date().toISOString();
     setState((prev) => {
       const updated = prev.vaccines.map((v) =>
         v.id === doseId
@@ -474,6 +666,7 @@ export default function App() {
               brandOrigin: undefined,
               fundingType: undefined,
               note: undefined,
+              updatedAt: now,
             }
           : v
       );
@@ -483,41 +676,121 @@ export default function App() {
         if (v.status === 'activated') return v;
         return { ...v, status: idx === firstUnactivated ? ('next' as const) : ('locked' as const) };
       });
-      return { ...prev, vaccines: normalized };
+      return { ...prev, vaccines: normalized, syncMeta: stampMeta(prev) };
     });
   };
 
   const handleAddIllness = (record: IllnessRecord) => {
+    hapticSuccess();
+    const stamped: IllnessRecord = {
+      ...record,
+      recorder: record.recorder || currentRecorder,
+      updatedAt: new Date().toISOString(),
+    };
     setState((prev) => {
-      const exists = prev.illnesses.some((item) => item.id === record.id);
+      const exists = prev.illnesses.some((item) => item.id === stamped.id);
       return {
         ...prev,
         illnesses: exists
-          ? prev.illnesses.map((item) => (item.id === record.id ? record : item))
-          : [record, ...prev.illnesses],
+          ? prev.illnesses.map((item) => (item.id === stamped.id ? stamped : item))
+          : [stamped, ...prev.illnesses],
+        syncMeta: stampMeta(prev),
       };
     });
   };
 
   const handleToggleIllnessHandled = (id: string) => {
+    hapticTap();
+    const now = new Date().toISOString();
     setState((prev) => ({
       ...prev,
       illnesses: prev.illnesses.map((item) =>
-        item.id === id ? { ...item, handled: !item.handled } : item
+        item.id === id ? { ...item, handled: !item.handled, updatedAt: now } : item
       ),
+      syncMeta: stampMeta(prev),
     }));
   };
 
   const handleDeleteIllness = (id: string) => {
+    hapticTap();
     setState((prev) => ({
       ...prev,
       illnesses: prev.illnesses.filter((i) => i.id !== id),
+      syncMeta: stampMeta(prev, id),
     }));
   };
 
   const handleUpdateProfile = (profile: BabyProfile) => {
     setHomeForceEmpty(false);
-    setState((prev) => ({ ...prev, profile }));
+    setState((prev) => ({ ...prev, profile, syncMeta: stampMeta(prev) }));
+  };
+
+  const handleMergeIncomingState = (incomingState: PlanetAppState) => {
+    const normalized = normalizeStateAssetPaths(incomingState);
+    const merged = mergePlanetStates(stateRef.current, normalized);
+    setHomeForceEmpty(false);
+    setState(merged.state);
+    return {
+      addedFeedings: merged.addedFeedings,
+      addedDiaries: merged.addedDiaries,
+      addedGrowths: merged.addedGrowths,
+      addedIllnesses: merged.addedIllnesses,
+    };
+  };
+
+  const handleInviteCoPilot = async (): Promise<string> => {
+    const title = stateRef.current.profile.planetName || '未知漫游者的登陆手帐';
+    const res = await cloudKitBridge.inviteCoPilot(title, stateRef.current);
+    if (res.mode === 'cloudkit') {
+      const participantRes = await cloudKitBridge.getParticipants();
+      setCoPilots(participantRes.participants || []);
+      return '已呼出 iOS 原生 iCloud 家庭共享面板，发送给爸爸或家人后点开即可实时同步';
+    }
+    if (res.mode === 'share-file') {
+      return '已呼出系统分享面板，家人收到后点击「合并家人同步包」即可无损合并';
+    }
+    return '已生成家庭同步包（JSON），发送给家人合并即可；在 Xcode 打包 iOS App 后将直连苹果原生 iCloud 共享';
+  };
+
+  const handleSyncNow = async (): Promise<string> => {
+    if (!isNativeIOSApp()) {
+      return '当前为网页预览模式；通过 Xcode 安装至 iPhone 后即可直接与私人 iCloud 同步';
+    }
+    setIsSyncingCloud(true);
+    try {
+      const status = await cloudKitBridge.getAccountStatus();
+      setCloudStatus(status);
+      cloudReadyRef.current = status.available;
+      if (!status.available) {
+        return '尚未检测到本机 iCloud 账号，请在 iPhone「设置 → Apple ID → iCloud」开启';
+      }
+
+      const pulled = await cloudKitBridge.pullLatest();
+      let workingState = stateRef.current;
+      let addedSummary = '';
+      if (pulled.found && pulled.state) {
+        const merged = mergePlanetStates(workingState, normalizeStateAssetPaths(pulled.state));
+        workingState = merged.state;
+        suppressNextPushRef.current = true;
+        setState(workingState);
+        const total =
+          merged.addedFeedings +
+          merged.addedDiaries +
+          merged.addedGrowths +
+          merged.addedIllnesses;
+        if (total > 0) {
+          addedSummary = `，已合并家人新增的 ${total} 条记录`;
+        }
+      }
+
+      await cloudKitBridge.pushSnapshot(workingState, currentRecorder);
+      const participantRes = await cloudKitBridge.getParticipants();
+      setCoPilots(participantRes.participants || []);
+      setLastSyncedAt(new Date().toISOString());
+      return `iCloud 同步完成${addedSummary}`;
+    } finally {
+      setIsSyncingCloud(false);
+    }
   };
 
   const handleQuickOpenVaccine = (dose: VaccineDose) => {
@@ -571,16 +844,14 @@ export default function App() {
                 onNavigate={handleNavigateTab}
                 onToggleChecklist={handleToggleChecklist}
                 onQuickOpenVaccine={handleQuickOpenVaccine}
-                onOpenSettingsDrawer={(side = 'left') => {
-                  setSettingsDrawerSide(side);
-                  setIsSettingsDrawerOpen(true);
-                }}
+                onOpenSettingsDrawer={() => setIsSettingsDrawerOpen(true)}
               />
             )}
 
             {activeTab === 'diary' && (
               <DiaryScreen
                 state={state}
+                currentRecorder={currentRecorder}
                 mode={diaryMode}
                 showSlotTag={showSlotTag}
                 onChangeMode={setDiaryMode}
@@ -593,6 +864,7 @@ export default function App() {
             {activeTab === 'feeding' && (
               <FeedingScreen
                 state={state}
+                currentRecorder={currentRecorder}
                 mode={feedingMode}
                 showSlotTag={showSlotTag}
                 onChangeMode={setFeedingMode}
@@ -618,6 +890,7 @@ export default function App() {
             {activeTab === 'health' && (
               <HealthScreen
                 state={state}
+                currentRecorder={currentRecorder}
                 mode={healthMode}
                 activeSheetDoseId={activeSheetDoseId}
                 showSlotTag={showSlotTag}
@@ -634,12 +907,21 @@ export default function App() {
             {activeTab === 'settings' && (
               <SettingsScreen
                 state={state}
+                currentRecorder={currentRecorder}
+                cloudStatus={cloudStatus}
+                coPilots={coPilots}
+                isSyncingCloud={isSyncingCloud}
+                lastSyncedAt={lastSyncedAt}
                 onBackHome={() => handleNavigateTab('home')}
+                onChangeCurrentRecorder={setCurrentRecorder}
                 onUpdateProfile={handleUpdateProfile}
                 onImportState={(nextState) => {
                   setHomeForceEmpty(false);
                   setState(normalizeStateAssetPaths(nextState));
                 }}
+                onMergeState={handleMergeIncomingState}
+                onInviteCoPilot={handleInviteCoPilot}
+                onSyncNow={handleSyncNow}
               />
             )}
           </div>
@@ -657,11 +939,19 @@ export default function App() {
               showSlotTag={showSlotTag}
             />
           )}
-          {/* 首页侧滑呼出的星际设置抽屉（支持从左侧或右侧呼出，严格约束在手机视口框架内） */}
+          {/* 首页左滑呼出的右侧星际设置抽屉（严格约束在手机视口框架内） */}
           <HomeSettingsDrawer
             open={isSettingsDrawerOpen && activeTab === 'home'}
-            side={settingsDrawerSide}
             state={state}
+            currentRecorder={currentRecorder}
+            cloudSyncLabel={
+              isNativeIOSApp()
+                ? cloudStatus.available
+                  ? 'iCloud 已就绪'
+                  : '待登录 iCloud'
+                : 'iOS 原生同步就绪'
+            }
+            onChangeCurrentRecorder={setCurrentRecorder}
             onClose={() => setIsSettingsDrawerOpen(false)}
             onNavigate={handleNavigateTab}
           />

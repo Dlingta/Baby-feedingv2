@@ -3,11 +3,13 @@ import {
   Baby,
   BookHeart,
   ChevronRight,
+  Cloud,
   HeartPulse,
   Milk,
   Settings,
   Sparkles,
   Sprout,
+  Users,
   X,
 } from 'lucide-react';
 import { ModuleTab, PlanetAppState } from '../types/planet';
@@ -16,16 +18,20 @@ import { PWAInstallButton } from './PWAInstallButton';
 
 interface HomeSettingsDrawerProps {
   open: boolean;
-  side?: 'left' | 'right';
   state: PlanetAppState;
+  currentRecorder: string;
+  cloudSyncLabel?: string;
+  onChangeCurrentRecorder: (recorder: string) => void;
   onClose: () => void;
   onNavigate: (tab: ModuleTab) => void;
 }
 
 export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
   open,
-  side = 'left',
   state,
+  currentRecorder,
+  cloudSyncLabel,
+  onChangeCurrentRecorder,
   onClose,
   onNavigate,
 }) => {
@@ -40,11 +46,8 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
       ? '女宝'
       : '小星尘';
 
-  const shouldCloseForDelta = (dx: number, dy: number) => {
-    const horizontalEnough = Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2;
-    if (!horizontalEnough) return false;
-    return side === 'left' ? dx < -40 : dx > 40;
-  };
+  const shouldCloseForDelta = (dx: number, dy: number) =>
+    dx > 40 && Math.abs(dx) > Math.abs(dy) * 1.2;
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0];
@@ -92,8 +95,6 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
     onNavigate(tab);
   };
 
-  const isLeft = side === 'left';
-
   return (
     <div
       aria-hidden={!open}
@@ -110,7 +111,7 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
         className="absolute inset-0 h-full w-full bg-[#04091c]/62 backdrop-blur-[2px]"
       />
 
-      {/* 左侧或右侧滑出星际设置抽屉 */}
+      {/* 右侧滑出星际设置抽屉 */}
       <aside
         role="dialog"
         aria-label="星球设置侧栏"
@@ -119,14 +120,8 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
         onTouchEnd={handleTouchEnd}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
-        className={`absolute inset-y-0 flex w-[80%] max-w-[308px] flex-col justify-between bg-gradient-to-b from-[#112250] via-[#0c183c] to-[#08112b] px-4 pt-safe pb-safe transition-transform duration-300 ease-out ${
-          isLeft
-            ? `left-0 rounded-r-[24px] border-r border-white/15 shadow-[16px_0_42px_rgba(2,6,20,0.75)] ${
-                open ? 'translate-x-0' : '-translate-x-full'
-              }`
-            : `right-0 rounded-l-[24px] border-l border-white/15 shadow-[-16px_0_42px_rgba(2,6,20,0.75)] ${
-                open ? 'translate-x-0' : 'translate-x-full'
-              }`
+        className={`absolute inset-y-0 right-0 flex w-[80%] max-w-[308px] flex-col justify-between rounded-l-[24px] border-l border-white/15 bg-gradient-to-b from-[#112250] via-[#0c183c] to-[#08112b] px-4 pt-safe pb-safe shadow-[-16px_0_42px_rgba(2,6,20,0.75)] transition-transform duration-300 ease-out ${
+          open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto no-scrollbar pt-2 pb-4">
@@ -173,10 +168,45 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
             >
               <span className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
-                <span>宝宝档案与系统设置</span>
+                <span>宝宝档案与 iCloud 家庭共享</span>
               </span>
               <ChevronRight className="h-4 w-4" />
             </button>
+          </div>
+
+          {/* 本机领航员身份快速切换 + iCloud 协作状态 */}
+          <div className="rounded-[20px] border border-white/12 bg-[#16295c]/65 p-3 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 typo-meta font-medium text-indigo-100">
+                <Users className="h-3.5 w-3.5 text-amber-300" />
+                <span>本机喂养人身份</span>
+              </span>
+              {cloudSyncLabel && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-sky-400/15 px-2 py-0.5 text-[10px] text-sky-200">
+                  <Cloud className="h-3 w-3" />
+                  <span>{cloudSyncLabel}</span>
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {state.profile.recorders.map((rec) => {
+                const active = rec === currentRecorder;
+                return (
+                  <button
+                    key={rec}
+                    type="button"
+                    onClick={() => onChangeCurrentRecorder(rec)}
+                    className={`rounded-full px-3 py-1 text-[11.5px] font-semibold transition-all active:scale-95 ${
+                      active
+                        ? 'bg-[#fde074] text-[#182848] shadow-2xs'
+                        : 'border border-white/12 bg-white/8 text-indigo-100/85 hover:bg-white/15'
+                    }`}
+                  >
+                    {rec}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* 快捷直达区 */}
@@ -241,7 +271,7 @@ export const HomeSettingsDrawer: React.FC<HomeSettingsDrawerProps> = ({
 
         {/* 底部手势提示 */}
         <div className="pt-2 text-center text-[11px] text-indigo-200/60">
-          {isLeft ? '向左滑动或点击空白处返回星球首页' : '向右滑动或点击空白处返回星球首页'}
+          向右滑动或点击空白处返回星球首页
         </div>
       </aside>
     </div>

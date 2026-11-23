@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Download, PlusSquare, Share, Smartphone, WifiOff, X } from 'lucide-react';
 import { useOnlineStatus, usePWAInstall } from '../hooks/usePWAInstall';
+import { isNativeApp } from '../native/iosBridge';
 
 interface PWAInstallButtonProps {
   compact?: boolean;
@@ -10,8 +11,8 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ compact = fa
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
 
-  // 已以独立 PWA 模式运行时自动隐藏
-  if (isInstalled) {
+  // 原生 iOS App 或独立主屏模式下自动隐藏网页安装引导
+  if (isNativeApp() || isInstalled) {
     return null;
   }
 

@@ -1,14 +1,16 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Calendar, ChevronRight, Mic, Pencil, Trash2, User, X } from 'lucide-react';
 import { DiaryEntry, DiaryMood, DiaryWeather, PlanetAppState } from '../types/planet';
 import { calculatePlanetAge, getTodayDateStr } from '../data/initialData';
 import { AssetSlot, IconStar } from '../components/Illustrations';
 import { CosmicModuleHeader, CosmicSubHeader } from '../components/CosmicModuleHeader';
+import { hapticTap, speechBridge } from '../native/iosBridge';
 
 export type DiaryViewMode = 'list' | 'detail' | 'empty' | 'form';
 
 interface DiaryScreenProps {
   state: PlanetAppState;
+  currentRecorder: string;
   mode: DiaryViewMode;
   showSlotTag?: boolean;
   onChangeMode: (mode: DiaryViewMode) => void;
@@ -32,11 +34,16 @@ const WEATHER_OPTIONS: { id: DiaryWeather; label: string; iconSrc: string }[] = 
   { id: 'starry', label: '星夜', iconSrc: './assets/extracted/icon_star.png' },
 ];
 
-const SAMPLE_DICTATIONS = [
-  '今天喝完奶之后打了个响亮的小奶嗝，接着对着窗外的树叶看了好久。',
-  '刚刚翻了个半身，小手一直在空中抓呀抓，像在抓天上的小星星。',
-  '洗完香香澡裹在浴巾里像一颗糯米团子，很快就进入了甜美梦乡。',
-];
+interface BrowserSpeechRecognitionLike {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
 
 function getWeatherSrc(weather: DiaryWeather): string {
   return (
@@ -51,6 +58,7 @@ function getMoodOption(mood: DiaryMood) {
 
 export const DiaryScreen: React.FC<DiaryScreenProps> = ({
   state,
+  currentRecorder,
   mode,
   showSlotTag = false,
   onChangeMode,
@@ -71,28 +79,52 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
   const [formDate, setFormDate] = useState(() => getTodayDateStr());
   const [formMood, setFormMood] = useState<DiaryMood>('glowing');
   const [formWeather, setFormWeather] = useState<DiaryWeather>('sunny');
-  const [formRecorder, setFormRecorder] = useState(state.profile.recorders[0] || '妈妈');
+  const [formRecorder, setFormRecorder] = useState(currentRecorder || state.profile.recorders[0] || '妈妈');
   const [formContent, setFormContent] = useState('');
   const [formReflection, setFormReflection] = useState('');
   const [formPhotos, setFormPhotos] = useState<string[]>([]);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
+  const stopVoiceRef = useRef<(() => Promise<void> | void) | null>(null);
+  const voiceBaseTextRef = useRef<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    return () => {
+      const stopFn = stopVoiceRef.current;
+      stopVoiceRef.current = null;
+      if (stopFn) {
+        void stopFn();
+      }
+    };
+  }, []);
+
+  const stopVoiceDictation = async () => {
+    const stopFn = stopVoiceRef.current;
+    stopVoiceRef.current = null;
+    setIsRecordingVoice(false);
+    if (stopFn) {
+      await stopFn();
+    }
+  };
+
   const openCreateForm = () => {
+    void stopVoiceDictation();
     setEditingId(null);
     setReturnToDetailAfterForm(false);
     setFormDate(getTodayDateStr());
     setFormMood('glowing');
     setFormWeather('sunny');
-    setFormRecorder(state.profile.recorders[0] || '妈妈');
+    setFormRecorder(currentRecorder || state.profile.recorders[0] || '妈妈');
     setFormContent('');
     setFormReflection('');
     setFormPhotos([]);
-    setIsRecordingVoice(false);
+    setVoiceNotice(null);
     onChangeMode('form');
   };
 
   const openEditForm = (entry: DiaryEntry, fromDetail = false) => {
+    void stopVoiceDictation();
     setEditingId(entry.id);
     setReturnToDetailAfterForm(fromDetail);
     setFormDate(entry.date);
@@ -102,7 +134,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
     setFormContent(entry.content);
     setFormReflection(entry.reflection || '');
     setFormPhotos(entry.photos);
-    setIsRecordingVoice(false);
+    setVoiceNotice(null);
     onChangeMode('form');
   };
 
@@ -112,13 +144,86 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
     onChangeMode('detail');
   };
 
-  const handleToggleVoice = () => {
-    if (!isRecordingVoice) {
+  const handleToggleVoice = async () => {
+    hapticTap();
+    setVoiceNotice(null);
+
+    if (isRecordingVoice) {
+      await stopVoiceDictation();
+      return;
+    }
+
+    voiceBaseTextRef.current = formContent.trim();
+
+    // 1. 原生 iOS App：调用苹果端侧 Speech 框架离线中文语音转文字
+    if (speechBridge.isNativeAvailable()) {
+      try {
+        setIsRecordingVoice(true);
+        const stopNative = await speechBridge.startNative((text, isFinal) => {
+          const prefix = voiceBaseTextRef.current;
+          setFormContent(prefix ? `${prefix}\n${text}` : text);
+          if (isFinal) {
+            setIsRecordingVoice(false);
+            stopVoiceRef.current = null;
+          }
+        });
+        stopVoiceRef.current = stopNative;
+        return;
+      } catch (err) {
+        setIsRecordingVoice(false);
+        setVoiceNotice(err instanceof Error ? err.message : '请在 iPhone 设置中允许语音识别与麦克风权限');
+        return;
+      }
+    }
+
+    // 2. 浏览器预览兜底：真实 Web Speech API（不使用假文案）
+    const speechWindow = window as unknown as {
+      SpeechRecognition?: new () => BrowserSpeechRecognitionLike;
+      webkitSpeechRecognition?: new () => BrowserSpeechRecognitionLike;
+    };
+    const SpeechCtor = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+    if (!SpeechCtor) {
+      setVoiceNotice('当前浏览器暂不支持语音转文字，在 iPhone 原生 App 中会自动调用 Apple Speech 离线识别');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechCtor();
+      recognition.lang = 'zh-CN';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.onresult = (event) => {
+        let spoken = '';
+        for (let i = 0; i < event.results.length; i++) {
+          spoken += event.results[i][0]?.transcript || '';
+        }
+        const cleaned = spoken.trim();
+        if (cleaned) {
+          const prefix = voiceBaseTextRef.current;
+          setFormContent(prefix ? `${prefix}\n${cleaned}` : cleaned);
+        }
+      };
+      recognition.onerror = () => {
+        setIsRecordingVoice(false);
+        stopVoiceRef.current = null;
+        setVoiceNotice('未获取到麦克风声音，请检查麦克风权限后重试');
+      };
+      recognition.onend = () => {
+        setIsRecordingVoice(false);
+        stopVoiceRef.current = null;
+      };
+      recognition.start();
       setIsRecordingVoice(true);
-    } else {
+      stopVoiceRef.current = () => {
+        try {
+          recognition.stop();
+        } catch {
+          // ignore
+        }
+      };
+    } catch {
       setIsRecordingVoice(false);
-      const snippet = SAMPLE_DICTATIONS[Math.floor(Math.random() * SAMPLE_DICTATIONS.length)];
-      setFormContent((prev) => (prev ? `${prev}\n${snippet}` : snippet));
+      setVoiceNotice('启动语音输入失败，请检查麦克风权限');
     }
   };
 
@@ -139,6 +244,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
 
   const handleSaveEntry = () => {
     if (!formContent.trim()) return;
+    void stopVoiceDictation();
     const entry: DiaryEntry = {
       id: editingId || `diary-${Date.now()}`,
       date: formDate,
@@ -148,6 +254,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
       weather: formWeather,
       recorder: formRecorder,
       photos: formPhotos,
+      updatedAt: new Date().toISOString(),
     };
     onSaveDiary(entry);
     setSelectedId(entry.id);
@@ -622,6 +729,11 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
                     <Mic className="h-4.5 w-4.5" />
                   </button>
                 </div>
+                {voiceNotice && (
+                  <p className="mt-1.5 rounded-xl bg-amber-100/80 px-2.5 py-1.5 text-[11.5px] text-amber-900">
+                    {voiceNotice}
+                  </p>
+                )}
 
                 {/* 小小感想选填框 */}
                 <input

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   Camera,
@@ -40,6 +40,7 @@ type FormTabKey = 'source' | 'energy' | 'dew';
 
 interface FeedingScreenProps {
   state: PlanetAppState;
+  currentRecorder: string;
   mode: FeedingViewMode;
   showSlotTag?: boolean;
   onChangeMode: (mode: FeedingViewMode) => void;
@@ -78,6 +79,7 @@ function buildSmoothPath(points: { x: number; y: number }[]): string {
 
 export const FeedingScreen: React.FC<FeedingScreenProps> = ({
   state,
+  currentRecorder,
   mode,
   showSlotTag = false,
   onChangeMode,
@@ -105,6 +107,13 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
   const [foodQtyStr, setFoodQtyStr] = useState('30');
   const [formTime, setFormTime] = useState(() => getCurrentTimeStr());
   const [formNote, setFormNote] = useState('');
+  const [formRecorder, setFormRecorder] = useState(
+    currentRecorder || state.profile.recorders[0] || '妈妈'
+  );
+
+  useEffect(() => {
+    setFormRecorder(currentRecorder || state.profile.recorders[0] || '妈妈');
+  }, [currentRecorder, state.profile.recorders]);
 
   // 本地离线 OCR 扫描纸质喂养记录状态（100% 浏览器本地运行，零外部 API）
   type PhotoStatus = 'idle' | 'scanning' | 'parsed' | 'no_match' | 'error';
@@ -310,7 +319,8 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
       foodAmount: d.foodAmount,
       note: d.note || '纸质记录本地扫码录入',
       photoUrl: idx === 0 && capturedPhotoUrl ? capturedPhotoUrl : undefined,
-      recorder: state.profile.recorders[0] || '妈妈',
+      recorder: formRecorder || currentRecorder || state.profile.recorders[0] || '妈妈',
+      updatedAt: new Date().toISOString(),
     }));
 
     if (onAddFeedings) {
@@ -387,7 +397,8 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
       type,
       note: formNote.trim() || undefined,
       photoUrl: capturedPhotoUrl || undefined,
-      recorder: state.profile.recorders[0] || '妈妈',
+      recorder: formRecorder || currentRecorder || state.profile.recorders[0] || '妈妈',
+      updatedAt: new Date().toISOString(),
       ...extra,
     };
 
@@ -1243,6 +1254,32 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                 </label>
               </div>
 
+              {/* 喂养人选择行（家庭共同喂养标识） */}
+              <div className="flex items-center gap-2.5">
+                <span className="w-16 shrink-0 text-[13.5px] font-bold text-[#182848]">
+                  喂养人
+                </span>
+                <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  {state.profile.recorders.map((rec) => {
+                    const active = formRecorder === rec;
+                    return (
+                      <button
+                        key={rec}
+                        type="button"
+                        onClick={() => setFormRecorder(rec)}
+                        className={`shrink-0 rounded-full border px-3 py-1 text-[12px] font-semibold transition-all active:scale-95 ${
+                          active
+                            ? 'border-[#e0a82e] bg-[#fde074] text-[#182848] shadow-2xs'
+                            : 'border-[#e0d2b8] bg-[#faf2e1] text-[#6d6256]'
+                        }`}
+                      >
+                        {rec}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* 备注（可选） */}
               <div>
                 <div className="mb-1 flex items-center justify-between">
@@ -1808,8 +1845,8 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                             />
                           </button>
                         )}
-                        <span className="rounded-full bg-[#efe4ce] px-2.5 py-0.5 typo-badge text-[#6d5f4e] tabular-nums">
-                          1次
+                        <span className="rounded-full bg-[#efe4ce] px-2.5 py-0.5 typo-badge text-[#6d5f4e]">
+                          {item.recorder || '妈妈'}
                         </span>
                         <button
                           type="button"
