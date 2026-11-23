@@ -173,13 +173,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
          ================================================================= */}
       <section
         style={{ minHeight: 'var(--app-viewport-h)' }}
-        className="relative flex w-full min-w-0 flex-col justify-end overflow-hidden bg-gradient-to-b from-[#060d24] via-[#091535] to-[#091535] pt-[env(safe-area-inset-top,0px)] select-none"
+        className="relative flex w-full min-w-0 flex-col justify-end overflow-hidden bg-gradient-to-b from-[#060d24] via-[#091535] to-[#091535] pt-[calc(var(--safe-top-resolved,env(safe-area-inset-top,0px))+10px)] select-none"
         aria-label="星球主视觉"
       >
-        {/* 顶部灵动岛延伸星空：在修长屏幕上无缝衔接下方插画星空，彻底避让灵动岛及顶部阴影 */}
+        {/* 顶部灵动岛延伸星空：在各代全面屏 iPhone 上无缝衔接下方插画星空，彻底避让灵动岛及顶部阴影 */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[220px] overflow-hidden"
+          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[290px] overflow-hidden"
         >
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_24%_28%,rgba(59,112,208,0.22),transparent_58%),radial-gradient(ellipse_at_80%_20%,rgba(250,204,21,0.12),transparent_52%)]" />
           <svg

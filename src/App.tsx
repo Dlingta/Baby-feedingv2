@@ -23,6 +23,7 @@ import { GrowthScreen, GrowthViewMode } from './screens/GrowthScreen';
 import { HealthScreen, HealthViewMode } from './screens/HealthScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { OfflineIndicator } from './components/PWAInstallButton';
+import { useViewportSafeArea } from './hooks/useViewportSafeArea';
 
 const STORAGE_KEY = 'planet_feeding_prototype_state_v1';
 
@@ -55,6 +56,8 @@ const normalizeStateAssetPaths = (appState: PlanetAppState): PlanetAppState => (
 });
 
 export default function App() {
+  useViewportSafeArea();
+
   const [state, setState] = useState<PlanetAppState>(() => {
     const todayStr = getTodayDateStr();
     const freshInit = createInitialAppState(todayStr);
@@ -211,9 +214,13 @@ export default function App() {
     const observer = new ResizeObserver(updateHeight);
     observer.observe(el);
     window.addEventListener('resize', updateHeight);
+    window.addEventListener('orientationchange', updateHeight);
+    window.addEventListener('pageshow', updateHeight);
     return () => {
       observer.disconnect();
       window.removeEventListener('resize', updateHeight);
+      window.removeEventListener('orientationchange', updateHeight);
+      window.removeEventListener('pageshow', updateHeight);
     };
   }, [previewWidth, activeTab, diaryMode, feedingMode, growthMode, healthMode]);
 
@@ -533,7 +540,7 @@ export default function App() {
   const currentScreenCode = getCurrentScreenCode();
 
   return (
-    <div className="fixed inset-0 flex h-full w-full max-w-full overflow-hidden bg-[#050b1c] text-slate-100 lg:static lg:min-h-[100dvh] lg:overflow-x-clip">
+    <div className="app-root-shell relative flex w-full max-w-full overflow-hidden bg-[#050b1c] text-slate-100 lg:static lg:overflow-x-clip">
       {/* 桌面端 16 页原型状态索引侧栏 */}
       <PrototypeSidebar
         activeScreen={currentScreenCode}
@@ -548,7 +555,7 @@ export default function App() {
       {/* 主画布区：iPhone/移动端 100% 铺满物理屏幕无底部留白，桌面端居中呈现 9:16 手机交互画布 */}
       <main className="flex h-full min-w-0 max-w-full flex-1 items-stretch justify-center overflow-hidden lg:h-auto lg:items-center lg:p-5">
         <div
-          className={`relative flex h-full w-full min-w-0 max-w-[430px] flex-col overflow-hidden cosmic-canvas transition-[width,height] duration-200 ${PREVIEW_FRAME_CLASS[previewWidth]} lg:max-w-none lg:max-h-[calc(100dvh-2.5rem)] lg:rounded-[40px] lg:border-[6px] lg:border-[#1c2c58] lg:shadow-[0_28px_80px_rgba(0,0,0,0.75)]`}
+          className={`relative flex h-full w-full min-w-0 max-w-[480px] flex-col overflow-hidden cosmic-canvas transition-[width,height] duration-200 ${PREVIEW_FRAME_CLASS[previewWidth]} lg:max-w-none lg:max-h-[calc(100dvh-2.5rem)] lg:rounded-[40px] lg:border-[6px] lg:border-[#1c2c58] lg:shadow-[0_28px_80px_rgba(0,0,0,0.75)]`}
         >
           <OfflineIndicator />
           {/* 垂直滚动内容区（严禁横向溢出） */}

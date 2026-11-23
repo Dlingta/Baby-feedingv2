@@ -145,7 +145,7 @@ export const OfflineIndicator: React.FC = () => {
   return (
     <div
       role="status"
-      className="pointer-events-none fixed left-1/2 top-[calc(env(safe-area-inset-top,0px)+8px)] z-[60] flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-amber-200/40 bg-[#1a2c5e]/95 px-3.5 py-1.5 text-[11.5px] font-medium text-amber-100 shadow-[0_8px_20px_rgba(3,8,24,0.55)] backdrop-blur-md"
+      className="pointer-events-none fixed left-1/2 top-[calc(var(--safe-top-resolved,env(safe-area-inset-top,0px))+14px)] z-[60] flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-amber-200/40 bg-[#1a2c5e]/95 px-3.5 py-1.5 text-[11.5px] font-medium text-amber-100 shadow-[0_8px_20px_rgba(3,8,24,0.55)] backdrop-blur-md"
     >
       <WifiOff className="h-3.5 w-3.5 text-amber-300" />
       <span>当前离线 · 本地记录仍可正常浏览与保存</span>
