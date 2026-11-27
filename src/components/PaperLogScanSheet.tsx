@@ -1,17 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  ArrowLeft,
+  AlertCircle,
   Camera,
   Check,
-  ClipboardPaste,
   Clock,
-  Eraser,
-  FileText,
   Image as ImageIcon,
   Loader2,
   Minus,
+  Pencil,
   Plus,
-  ScanText,
   Sparkles,
   Trash2,
   X,
@@ -25,138 +22,53 @@ import {
   PAPER_LOG_TYPE_MAP,
   PaperLogDraft,
   PaperLogItemType,
-  parsePaperLogText,
-  SAMPLE_PAPER_LOG_TEXT,
 } from '../utils/paperLogParser';
-import { processFeedingPhotoFile } from '../utils/feedingPhoto';
-import { isNativeIOSApp, visionOcrBridge } from '../native/iosBridge';
+
+export type PaperScanSheetStatus = 'recognizing' | 'review' | 'error';
 
 interface PaperLogScanSheetProps {
   open: boolean;
+  status: PaperScanSheetStatus;
   selectedDate: string;
   recorder: string;
+  photoDataUrl: string | null;
+  initialDrafts: PaperLogDraft[];
+  errorMessage: string | null;
   onClose: () => void;
+  onRetakeCamera: () => void;
+  onPickAlbum: () => void;
+  onSwitchToReview?: () => void;
   onConfirmImport: (records: FeedingRecord[]) => void;
 }
 
 export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
   open,
+  status,
   selectedDate,
   recorder,
+  photoDataUrl,
+  initialDrafts,
+  errorMessage,
   onClose,
+  onRetakeCamera,
+  onPickAlbum,
+  onSwitchToReview,
   onConfirmImport,
 }) => {
-  const [step, setStep] = useState<'input' | 'review'>('input');
-  const [rawText, setRawText] = useState('');
-  const [drafts, setDrafts] = useState<PaperLogDraft[]>([]);
-  const [hintMsg, setHintMsg] = useState<string | null>(null);
-  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
-  const [photoNotice, setPhotoNotice] = useState<string | null>(null);
-  const [isHandlingPhoto, setIsHandlingPhoto] = useState(false);
+  const [drafts, setDrafts] = useState<PaperLogDraft[]>(initialDrafts);
   const [zoomPhoto, setZoomPhoto] = useState(false);
 
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const cameraInputRef = useRef<HTMLInputElement | null>(null);
-  const albumInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    setDrafts(initialDrafts);
+  }, [initialDrafts]);
 
   useEffect(() => {
-    if (open) {
-      setStep('input');
-      setHintMsg(null);
+    if (!open) {
       setZoomPhoto(false);
     }
   }, [open]);
 
   if (!open) return null;
-
-  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-
-    setIsHandlingPhoto(true);
-    setHintMsg(null);
-    setPhotoNotice(null);
-
-    try {
-      const processed = await processFeedingPhotoFile(file);
-      setPhotoDataUrl(processed.previewDataUrl);
-
-      // 若运行在打包后的原生 iOS App 内，自动调用苹果本地 Vision 框架识字
-      if (isNativeIOSApp()) {
-        const visionRes = await visionOcrBridge.recognizeText(processed.previewDataUrl);
-        if (visionRes && visionRes.text.trim()) {
-          const text = visionRes.text.trim();
-          setRawText(text);
-          const parsed = parsePaperLogText(text, processed.exifTime || getCurrentTimeStr());
-          if (parsed.length > 0) {
-            setDrafts(parsed);
-            setStep('review');
-            setPhotoNotice('已通过 Apple Vision 本地识字并完成解析');
-            return;
-          }
-          setPhotoNotice('已识别出纸面文字，可核对微调后点「开始解析」');
-          return;
-        }
-      }
-
-      // 网页 / Safari 模式：直接展示纸质照片（支持 iOS Safari 长按照片实况文本复制 + 随记录留档）
-      setPhotoNotice(
-        '照片已拍摄并留档：可直接长按上方照片里的文字选择拷贝，或轻点下方输入框用 iOS「自动填充 → 扫描文本」直接扫字'
-      );
-    } catch (err) {
-      setHintMsg(err instanceof Error ? err.message : '读取照片失败，请重新拍照尝试');
-    } finally {
-      setIsHandlingPhoto(false);
-    }
-  };
-
-  const handlePasteClipboard = async () => {
-    try {
-      if (navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
-        const clip = await navigator.clipboard.readText();
-        if (clip && clip.trim()) {
-          setRawText((prev) => (prev.trim() ? `${prev.trim()}\n${clip.trim()}` : clip.trim()));
-          setHintMsg(null);
-          return;
-        }
-      }
-      setHintMsg('请轻点下方输入框，在系统弹窗中点「粘贴」即可');
-      textareaRef.current?.focus();
-    } catch {
-      setHintMsg('请轻点下方输入框，在系统弹窗中点「粘贴」即可');
-      textareaRef.current?.focus();
-    }
-  };
-
-  const handleClear = () => {
-    setRawText('');
-    setHintMsg(null);
-    textareaRef.current?.focus();
-  };
-
-  const handleFillSample = () => {
-    setRawText(SAMPLE_PAPER_LOG_TEXT);
-    setHintMsg(null);
-  };
-
-  const handleParse = () => {
-    if (!rawText.trim()) {
-      setHintMsg('请先通过上方拍照长按取字、iOS「扫描文本」输入，或点「填入示例文本」体验');
-      textareaRef.current?.focus();
-      return;
-    }
-
-    const parsed = parsePaperLogText(rawText, getCurrentTimeStr());
-    if (parsed.length === 0) {
-      setHintMsg('暂未匹配到明确的奶量、亲喂或大小便关键词，可调整文字格式或直接手动补录');
-      return;
-    }
-
-    setHintMsg(null);
-    setDrafts(parsed);
-    setStep('review');
-  };
 
   const handleUpdateDraft = (id: string, patch: Partial<PaperLogDraft>) => {
     setDrafts((prev) =>
@@ -165,6 +77,7 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
         const nextType = patch.type ?? item.type;
         let nextValue = patch.value ?? item.value;
 
+        // 跨单位切换类型时自动切换到该类型合理默认值
         if (patch.type && patch.type !== item.type) {
           const prevUnit = PAPER_LOG_TYPE_MAP[item.type].unit;
           const nextMeta = PAPER_LOG_TYPE_MAP[patch.type];
@@ -200,8 +113,12 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
       time: lastTime,
       type: 'formula',
       value: 120,
+      note: '',
     };
     setDrafts((prev) => [...prev, newDraft]);
+    if (status === 'error' && onSwitchToReview) {
+      onSwitchToReview();
+    }
   };
 
   const handleConfirmSave = () => {
@@ -213,39 +130,20 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
       photoDataUrl
     );
     onConfirmImport(records);
-    setRawText('');
-    setDrafts([]);
-    setPhotoDataUrl(null);
-    setPhotoNotice(null);
-    setStep('input');
-    onClose();
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-[#040a1d]/75 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-[#040a1d]/76 backdrop-blur-xs"
       role="dialog"
       aria-modal="true"
-      aria-label="扫描纸质本导入"
-      onClick={onClose}
+      aria-label="拍照识别纸质记录本"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && status !== 'recognizing') {
+          onClose();
+        }
+      }}
     >
-      {/* 真实系统后置相机拍照 & 相册选择输入 */}
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={handlePhotoSelect}
-        className="hidden"
-      />
-      <input
-        ref={albumInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handlePhotoSelect}
-        className="hidden"
-      />
-
       <div
         onClick={(e) => e.stopPropagation()}
         className="flex max-h-[90dvh] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[28px] border-t-2 border-amber-200/50 bg-[#fbf4e4] text-[#182848] shadow-[0_-18px_50px_rgba(3,8,24,0.65)]"
@@ -255,28 +153,23 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
           <div className="mx-auto mb-2.5 h-1 w-10 rounded-full bg-white/30" aria-hidden="true" />
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              {step === 'review' ? (
-                <button
-                  type="button"
-                  onClick={() => setStep('input')}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/12 text-amber-100 transition-transform active:scale-90"
-                  aria-label="返回修改原文"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </button>
-              ) : (
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-300/20 text-amber-200">
-                  <ScanText className="h-4.5 w-4.5" />
-                </span>
-              )}
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-300/20 text-amber-200">
+                <Sparkles className="h-4 w-4" />
+              </span>
               <div className="min-w-0">
                 <h2 className="truncate text-[16px] font-bold tracking-wide text-[#fff8e7]">
-                  {step === 'input' ? '拍照 / 扫描纸质本' : `核对解析结果（${drafts.length}条）`}
+                  {status === 'recognizing'
+                    ? '正在识别纸质记录本'
+                    : status === 'error'
+                    ? '识别遇到一点小状况'
+                    : `核对识别结果（${drafts.length} 条）`}
                 </h2>
                 <p className="truncate text-[11px] text-indigo-100/80">
-                  {step === 'input'
-                    ? `导入至 ${selectedDate.replace(/-/g, '.')} · 纯本地解析，零外部 API`
-                    : '点击卡片可直接修改时间、类型或数值'}
+                  {status === 'recognizing'
+                    ? 'AI 正在逐行阅读保姆手写的奶量与大小便'
+                    : status === 'error'
+                    ? '可重新拍照、换相册照片或直接手动补录'
+                    : `将导入至 ${selectedDate.replace(/-/g, '.')} · 点击卡片即可微调`}
                 </p>
               </div>
             </div>
@@ -292,178 +185,104 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
           </div>
         </div>
 
-        {/* 内容滚动区 */}
-        {step === 'input' ? (
-          <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-[max(env(safe-area-inset-bottom,16px),20px)] pt-3.5">
-            {/* 1. 真实拍照 / 相册入口卡片 */}
-            <div className="rounded-[20px] border border-[#e4d2ae] bg-[#fffaf0] p-3 shadow-[0_3px_10px_rgba(120,90,40,0.06)]">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  disabled={isHandlingPhoto}
-                  onClick={() => cameraInputRef.current?.click()}
-                  className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-[15px] bg-gradient-to-b from-[#fde074] to-[#f4bd36] px-3 py-2 text-[13.5px] font-bold text-[#182848] shadow-[0_3px_10px_rgba(244,189,54,0.35)] transition-transform active:scale-95 disabled:opacity-60"
-                >
-                  {isHandlingPhoto ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Camera className="h-4 w-4" />
-                  )}
-                  <span>{photoDataUrl ? '重拍纸质本' : '拍照拍纸质本'}</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={isHandlingPhoto}
-                  onClick={() => albumInputRef.current?.click()}
-                  className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-[15px] border border-[#decba7] bg-[#f4ead4] px-3 py-2 text-[13.5px] font-semibold text-[#182848] transition-transform active:scale-95 disabled:opacity-60"
-                >
-                  <ImageIcon className="h-4 w-4 text-[#8c6426]" />
-                  <span>从相册选图</span>
-                </button>
-              </div>
-
-              {/* 拍摄后的纸质本照片预览（不禁用长按，iOS Safari 可直接长按图片触发原生实况文本取字） */}
-              {photoDataUrl && (
-                <div className="mt-2.5 space-y-2">
-                  <div className="relative overflow-hidden rounded-[14px] border border-[#dfd0b1] bg-[#f4ead4]">
-                    <img
-                      src={photoDataUrl}
-                      alt="已拍摄的纸质喂养记录本"
-                      className="max-h-44 w-full object-contain"
-                    />
-                    <div className="absolute right-2 top-2 flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setZoomPhoto(true)}
-                        aria-label="放大查看纸质照片"
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-[#182848]/80 text-white backdrop-blur-xs active:scale-90"
-                      >
-                        <ZoomIn className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPhotoDataUrl(null);
-                          setPhotoNotice(null);
-                        }}
-                        aria-label="移除照片"
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-[#182848]/80 text-white backdrop-blur-xs active:scale-90"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                  {photoNotice && (
-                    <p className="text-[11.5px] leading-relaxed text-[#6b4f1d]">{photoNotice}</p>
-                  )}
+        {/* 状态一：温馨识别加载中 */}
+        {status === 'recognizing' && (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 pb-[max(env(safe-area-inset-bottom,24px),28px)] pt-6 text-center">
+            {photoDataUrl && (
+              <div className="relative w-full max-w-[240px] overflow-hidden rounded-[20px] border-2 border-[#e5d2ab] bg-[#f4ead4] shadow-md">
+                <img
+                  src={photoDataUrl}
+                  alt="正在识别的纸质喂养记录"
+                  className="max-h-48 w-full object-cover opacity-90"
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-[#12234d]/28 backdrop-blur-[1px]">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#fde074] text-[#182848] shadow-[0_0_20px_rgba(253,224,116,0.75)]">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </span>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* 2. iOS 系统原生「实况文本 / 扫描文本」操作提示 */}
-            <div className="flex items-start gap-2 rounded-[16px] border border-[#e7d3a7] bg-[#fff7e0] px-3 py-2 text-[12px] leading-relaxed text-[#5c4218]">
-              <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-[#f9cf4c] text-[#182848]">
-                <Sparkles className="h-2.5 w-2.5" />
-              </span>
-              <p className="font-medium">
-                iOS 直接扫字：轻点下方输入框 → 轻点光标呼出系统菜单「自动填充 → 扫描文本」→ 对准纸质本即可自动上屏
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 text-[16px] font-bold text-[#182848]">
+                {!photoDataUrl && <Loader2 className="h-4.5 w-4.5 animate-spin text-[#d97706]" />}
+                <span>正在努力辨认纸质记录中…</span>
+              </div>
+              <p className="text-[12.5px] leading-relaxed text-[#726352]">
+                已自动压缩图片加快识别速度，马上为你整理好每条喂奶与大小便卡片
               </p>
             </div>
+          </div>
+        )}
 
-            {/* 3. 标准可编辑 textarea：严禁 readonly/disabled，16px 防 iOS Safari 自动缩放 */}
-            <div className="rounded-[20px] border-2 border-[#e3d2b1] bg-[#fffdf7] p-3 shadow-[inset_0_2px_6px_rgba(120,90,40,0.06)] focus-within:border-[#f2b830]">
-              <textarea
-                ref={textareaRef}
-                value={rawText}
-                onChange={(e) => {
-                  setRawText(e.target.value);
-                  if (hintMsg) setHintMsg(null);
-                }}
-                rows={5}
-                inputMode="text"
-                autoCorrect="off"
-                spellCheck={false}
-                placeholder={
-                  '轻点此处呼出 iOS「扫描文本」或粘贴从照片拷贝的文字，每行一条：\n8:30 配方120ml 尿1\n11:15 亲喂15分钟 大便1次\n14:00 母乳100 嘘嘘'
-                }
-                className="w-full resize-none bg-transparent text-[16px] leading-relaxed text-[#182848] placeholder:text-[13.5px] placeholder:text-[#a69783] focus:outline-none"
-              />
-            </div>
-
-            {/* 辅助提示 */}
-            {hintMsg && (
-              <div className="flex items-center justify-between gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-[#7c4d0d]">
-                <span>{hintMsg}</span>
+        {/* 状态二：识别失败 / 友好兜底重试 */}
+        {status === 'error' && (
+          <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-[max(env(safe-area-inset-bottom,18px),22px)] pt-4">
+            {photoDataUrl && (
+              <div className="relative overflow-hidden rounded-[18px] border border-[#dfd0b1] bg-[#f4ead4]">
+                <img
+                  src={photoDataUrl}
+                  alt="已拍摄的纸质喂养记录"
+                  className="max-h-44 w-full object-contain"
+                />
                 <button
                   type="button"
-                  onClick={() => {
-                    setDrafts([
-                      {
-                        id: `paper-manual-${Date.now()}`,
-                        time: getCurrentTimeStr(),
-                        type: 'formula',
-                        value: 120,
-                      },
-                    ]);
-                    setStep('review');
-                  }}
-                  className="shrink-0 rounded-full bg-[#182848] px-2.5 py-1 text-[11px] font-semibold text-amber-100"
+                  onClick={() => setZoomPhoto(true)}
+                  className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-[#182848]/80 px-2.5 py-1 text-[11px] font-semibold text-white"
                 >
-                  手动补录
+                  <ZoomIn className="h-3.5 w-3.5" />
+                  <span>放大</span>
                 </button>
               </div>
             )}
 
-            {/* 辅助按钮 + 主按钮「开始解析」 */}
-            <div className="space-y-2.5 pt-0.5">
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="flex min-h-[40px] items-center justify-center gap-1 rounded-[14px] border border-[#decba7] bg-[#f4ead4] px-2 py-2 text-[12.5px] font-semibold text-[#5a4e3f] transition-transform active:scale-95"
-                >
-                  <Eraser className="h-3.5 w-3.5" />
-                  <span>清空</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePasteClipboard}
-                  className="flex min-h-[40px] items-center justify-center gap-1 rounded-[14px] border border-[#decba7] bg-[#fffaf0] px-2 py-2 text-[12.5px] font-semibold text-[#182848] transition-transform active:scale-95"
-                >
-                  <ClipboardPaste className="h-3.5 w-3.5 text-[#0284c7]" />
-                  <span>粘贴文字</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleFillSample}
-                  className="flex min-h-[40px] items-center justify-center gap-1 rounded-[14px] border border-[#decba7] bg-[#fffaf0] px-2 py-2 text-[12.5px] font-semibold text-[#182848] transition-transform active:scale-95"
-                >
-                  <FileText className="h-3.5 w-3.5 text-[#d97706]" />
-                  <span>填入示例</span>
-                </button>
-              </div>
+            <div className="flex items-start gap-2.5 rounded-[18px] border border-rose-200 bg-rose-50 px-3.5 py-3 text-[13px] leading-relaxed text-rose-800">
+              <AlertCircle className="mt-0.5 h-4.5 w-4.5 shrink-0 text-rose-500" />
+              <span>{errorMessage || '没能看清纸面上的字迹，建议光线充足、平拍再试一次。'}</span>
+            </div>
 
+            <div className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
-                onClick={handleParse}
-                className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[18px] border-2 border-[#fff2b8] bg-gradient-to-b from-[#fde074] via-[#f9ca44] to-[#f1b429] px-5 py-3 text-[15.5px] font-bold text-[#182848] shadow-[0_8px_20px_rgba(244,189,54,0.4)] transition-transform hover:brightness-105 active:scale-[0.98]"
+                onClick={onRetakeCamera}
+                className="flex min-h-[46px] items-center justify-center gap-1.5 rounded-[16px] bg-gradient-to-b from-[#fde074] to-[#f4bd36] px-4 py-2.5 text-[14px] font-bold text-[#182848] shadow-[0_6px_16px_rgba(244,189,54,0.35)] active:scale-95"
               >
-                <Sparkles className="h-4.5 w-4.5" />
-                <span>开始解析</span>
+                <Camera className="h-4 w-4" />
+                <span>重新拍照</span>
+              </button>
+              <button
+                type="button"
+                onClick={onPickAlbum}
+                className="flex min-h-[46px] items-center justify-center gap-1.5 rounded-[16px] border border-[#decba7] bg-[#fffaf0] px-4 py-2.5 text-[14px] font-semibold text-[#182848] active:scale-95"
+              >
+                <ImageIcon className="h-4 w-4 text-[#8c6426]" />
+                <span>相册选图</span>
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={handleAddManualDraft}
+              className="flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-[15px] border border-dashed border-[#c7b089] bg-[#fffaf0] px-3 py-2 text-[13px] font-semibold text-[#5b4d3e] active:scale-98"
+            >
+              <Plus className="h-4 w-4 text-[#d97706]" />
+              <span>直接手动补录一条</span>
+            </button>
           </div>
-        ) : (
+        )}
+
+        {/* 状态三：可编辑核对卡片列表 */}
+        {status === 'review' && (
           <>
-            {/* 步骤三：人工核对卡片列表 */}
             <div className="flex-1 space-y-2.5 overflow-y-auto px-4 pb-3 pt-3">
+              {/* 顶部原图缩略对照条 + 重拍/相册入口 */}
               {photoDataUrl && (
-                <button
-                  type="button"
-                  onClick={() => setZoomPhoto(true)}
-                  className="flex w-full items-center justify-between gap-2.5 rounded-[16px] border border-[#e3d2b1] bg-[#fffaf0] px-3 py-2 text-left transition-transform active:scale-[0.99]"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center justify-between gap-2 rounded-[16px] border border-[#e3d2b1] bg-[#fffaf0] px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => setZoomPhoto(true)}
+                    className="flex min-w-0 flex-1 items-center gap-2.5 text-left active:scale-[0.99]"
+                  >
                     <img
                       src={photoDataUrl}
                       alt="纸质本原图缩略图"
@@ -471,23 +290,50 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
                     />
                     <div className="min-w-0">
                       <div className="text-[12.5px] font-bold text-[#182848]">
-                        已附带纸质记录原图
+                        对照纸质原图核对
                       </div>
                       <div className="truncate text-[11px] text-[#7c6e5c]">
-                        点击可放大对照核对，存入时将一并留档
+                        轻点可放大查看，存入时将一并留档
                       </div>
                     </div>
-                  </div>
-                  <ZoomIn className="h-4 w-4 shrink-0 text-[#8c6426]" />
-                </button>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onRetakeCamera}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#decba7] bg-[#f4ead4] px-2.5 py-1 text-[11.5px] font-semibold text-[#182848] active:scale-95"
+                  >
+                    <Camera className="h-3.5 w-3.5 text-[#8c6426]" />
+                    <span>重拍</span>
+                  </button>
+                </div>
               )}
 
               {drafts.length === 0 ? (
                 <div className="rounded-[20px] border border-dashed border-[#d8c49f] bg-[#fffaf0] px-4 py-8 text-center">
-                  <p className="text-[14px] font-semibold text-[#4e4234]">核对列表已清空</p>
-                  <p className="mt-1 text-[12px] text-[#847563]">
-                    可点击下方「+ 手动补录一条」，或返回重新扫描纸质记录
+                  <p className="text-[14px] font-semibold text-[#4e4234]">
+                    暂未识别到明确的喂养或大小便记录
                   </p>
+                  <p className="mt-1 text-[12px] text-[#847563]">
+                    可点击下方「+ 手动补录」，或重新拍一张光线更清晰的纸质记录
+                  </p>
+                  <div className="mt-3 flex justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={onRetakeCamera}
+                      className="inline-flex items-center gap-1 rounded-full bg-[#f9cf4c] px-3.5 py-1.5 text-[12.5px] font-bold text-[#182848]"
+                    >
+                      <Camera className="h-3.5 w-3.5" />
+                      <span>重新拍照</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onPickAlbum}
+                      className="inline-flex items-center gap-1 rounded-full border border-[#decba7] bg-[#f4ead4] px-3.5 py-1.5 text-[12.5px] font-semibold text-[#182848]"
+                    >
+                      <ImageIcon className="h-3.5 w-3.5" />
+                      <span>相册选图</span>
+                    </button>
+                  </div>
                 </div>
               ) : (
                 drafts.map((draft, idx) => {
@@ -497,6 +343,7 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
                       key={draft.id}
                       className="rounded-[20px] border border-[#e3d2b1] bg-[#fffdf7] p-3 shadow-[0_4px_12px_rgba(120,90,40,0.08)]"
                     >
+                      {/* 第 1 行：序号 + 时间选择 + 删除 */}
                       <div className="mb-2.5 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <span className="flex h-5.5 w-5.5 items-center justify-center rounded-full bg-[#182848] font-typewriter text-[11px] font-bold text-amber-200">
@@ -520,7 +367,7 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
                         <button
                           type="button"
                           onClick={() => handleDeleteDraft(draft.id)}
-                          aria-label="删除这条核对记录"
+                          aria-label="删除这条记录"
                           className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11.5px] font-semibold text-rose-600 transition-transform active:scale-95"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -528,6 +375,7 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
                         </button>
                       </div>
 
+                      {/* 第 2 行：5 种类型切换胶囊 */}
                       <div className="mb-2.5 flex flex-wrap gap-1.5">
                         {PAPER_LOG_TYPE_LIST.map((opt) => {
                           const isActive = draft.type === opt.type;
@@ -550,6 +398,7 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
                         })}
                       </div>
 
+                      {/* 第 3 行：对应数值（奶量 ml / 亲喂分钟 / 大小便次数） */}
                       <div className="flex items-center justify-between gap-2 rounded-2xl border border-[#ece0c7] bg-[#faf3e3] px-3 py-2">
                         <span className="text-[12.5px] font-semibold text-[#5b4d3e]">
                           {draft.type === 'breast_direct'
@@ -609,17 +458,24 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
                         </div>
                       </div>
 
-                      {draft.rawLine && (
-                        <div className="mt-1.5 truncate px-0.5 text-[11px] text-[#8d7d69]">
-                          原文：{draft.rawLine}
-                        </div>
-                      )}
+                      {/* 第 4 行：备注输入（如“吐奶”“偏稀”） */}
+                      <div className="mt-2 flex items-center gap-1.5 rounded-xl border border-[#ece0c7] bg-[#fffaf0] px-2.5 py-1.5">
+                        <Pencil className="h-3.5 w-3.5 shrink-0 text-[#9c8a72]" />
+                        <input
+                          type="text"
+                          value={draft.note ?? ''}
+                          onChange={(e) => handleUpdateDraft(draft.id, { note: e.target.value })}
+                          placeholder="备注（可选，如吐奶、偏稀）"
+                          className="w-full bg-transparent text-[13px] text-[#182848] placeholder:text-[#a89a88] focus:outline-none"
+                        />
+                      </div>
                     </div>
                   );
                 })
               )}
             </div>
 
+            {/* 底部固定按钮栏：+ 手动补录 + 确认全部存入 */}
             <div className="shrink-0 space-y-2 border-t border-[#e7d8bc] bg-[#f8efe0] px-4 pb-[max(env(safe-area-inset-bottom,16px),18px)] pt-3">
               <button
                 type="button"
@@ -627,7 +483,7 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
                 className="flex min-h-[40px] w-full items-center justify-center gap-1.5 rounded-[15px] border border-dashed border-[#c7b089] bg-[#fffaf0] px-3 py-2 text-[13px] font-semibold text-[#182848] transition-transform active:scale-98"
               >
                 <Plus className="h-4 w-4 text-[#d97706]" />
-                <span>手动补录一条</span>
+                <span>手动补录</span>
               </button>
 
               <button
@@ -644,10 +500,10 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
         )}
       </div>
 
-      {/* 全屏放大查看已拍纸质记录本（在 iOS Safari 中长按照片即可直接实况文本划选复制） */}
+      {/* 全屏放大查看原图 */}
       {zoomPhoto && photoDataUrl && (
         <div
-          className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-black/88 p-4 backdrop-blur-xs"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/88 p-4 backdrop-blur-xs"
           onClick={(e) => {
             e.stopPropagation();
             setZoomPhoto(false);
@@ -668,11 +524,8 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
             src={photoDataUrl}
             alt="纸质喂养本原图"
             onClick={(e) => e.stopPropagation()}
-            className="max-h-[78vh] max-w-full rounded-2xl border border-white/15 object-contain shadow-2xl"
+            className="max-h-[82vh] max-w-full rounded-2xl border border-white/15 object-contain shadow-2xl"
           />
-          <p className="mt-3 text-center text-[12px] text-amber-100/90">
-            iPhone 长按照片上的文字即可直接选择并拷贝，回到输入框点「粘贴文字」解析
-          </p>
         </div>
       )}
     </div>

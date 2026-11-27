@@ -202,6 +202,32 @@ export default defineConfig(() => {
           type: 'module',
         },
       }),
+      // Local dev middleware for Vercel Serverless Function /api/recognize
+      {
+        name: 'local-api-recognize',
+        configureServer(server) {
+          server.middlewares.use('/api/recognize', async (req, res, next) => {
+            try {
+              const mod = await server.ssrLoadModule('/api/recognize.ts');
+              const handler = mod?.default;
+              if (typeof handler === 'function') {
+                await handler(req, res);
+                return;
+              }
+            } catch (err) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.end(
+                JSON.stringify({
+                  error: err instanceof Error ? err.message : '本地识别接口初始化失败',
+                }),
+              );
+              return;
+            }
+            next();
+          });
+        },
+      },
       // Auto-generates /fonts/custom-fonts.css and inlines @font-face + preload into index.html in both dev and build.
       {
         name: 'auto-custom-fonts',

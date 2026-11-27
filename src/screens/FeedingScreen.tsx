@@ -10,7 +10,6 @@ import {
   Image as ImageIcon,
   Pencil,
   Plus,
-  ScanText,
   Trash2,
   X,
 } from 'lucide-react';
@@ -22,8 +21,15 @@ import {
   CosmicSubHeader,
   HandDrawnInfoIcon,
 } from '../components/CosmicModuleHeader';
-import { PaperLogScanSheet } from '../components/PaperLogScanSheet';
-import { processFeedingPhotoFile } from '../utils/feedingPhoto';
+import {
+  PaperLogScanSheet,
+  PaperScanSheetStatus,
+} from '../components/PaperLogScanSheet';
+import {
+  processFeedingPhotoFile,
+  recognizeFeedingPhotoViaApi,
+} from '../utils/feedingPhoto';
+import { PaperLogDraft } from '../utils/paperLogParser';
 import { hapticSuccess } from '../native/iosBridge';
 
 export type FeedingViewMode = 'timeline' | 'empty' | 'form';
@@ -107,14 +113,17 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
     setFormRecorder(currentRecorder || state.profile.recorders[0] || '妈妈');
   }, [currentRecorder, state.profile.recorders]);
 
-  // 纸质记录扫码导入（iOS 原生实况文本 + 纯本地 JS 正则解析）与可选照片留档状态
+  // 拍照识别纸质记录本（一键拍照 -> Canvas 压缩 -> /api/recognize -> 可编辑核对卡片）
   const [isPaperScanOpen, setIsPaperScanOpen] = useState(false);
+  const [paperScanStatus, setPaperScanStatus] = useState<PaperScanSheetStatus>('recognizing');
+  const [paperScanPhotoUrl, setPaperScanPhotoUrl] = useState<string | null>(null);
+  const [paperScanDrafts, setPaperScanDrafts] = useState<PaperLogDraft[]>([]);
+  const [paperScanError, setPaperScanError] = useState<string | null>(null);
   const [importToast, setImportToast] = useState<string | null>(null);
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  const [capturedPhotoUrl, setCapturedPhotoUrl] = useState<string | null>(null);
   const [lightboxPhotoUrl, setLightboxPhotoUrl] = useState<string | null>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const aiScanCameraInputRef = useRef<HTMLInputElement>(null);
+  const aiScanAlbumInputRef = useRef<HTMLInputElement>(null);
+  const aiScanRequestIdRef = useRef(0);
   const toastTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -218,20 +227,52 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
       );
   }, [state.feedings, selectedDate, isEmptyView]);
 
-  const handlePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const triggerAiScanCamera = () => {
+    aiScanCameraInputRef.current?.click();
+  };
+
+  const triggerAiScanAlbum = () => {
+    aiScanAlbumInputRef.current?.click();
+  };
+
+  const handleClosePaperScan = () => {
+    // 递增请求序号，确保已关闭后旧的异步识别响应不会重新覆盖状态
+    aiScanRequestIdRef.current += 1;
+    setIsPaperScanOpen(false);
+  };
+
+  const handleAiScanFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
 
-    setPhotoError(null);
+    const requestId = ++aiScanRequestIdRef.current;
+    setIsPaperScanOpen(true);
+    setPaperScanStatus('recognizing');
+    setPaperScanError(null);
+    setPaperScanDrafts([]);
+    setPaperScanPhotoUrl(null);
+
     try {
       const processed = await processFeedingPhotoFile(file);
-      setCapturedPhotoUrl(processed.previewDataUrl);
-      if (processed.exifTime) {
-        setFormTime(processed.exifTime);
-      }
+      if (requestId !== aiScanRequestIdRef.current) return;
+
+      setPaperScanPhotoUrl(processed.previewDataUrl);
+
+      const drafts = await recognizeFeedingPhotoViaApi(
+        processed.recognizeDataUrl,
+        processed.exifTime || getCurrentTimeStr()
+      );
+      if (requestId !== aiScanRequestIdRef.current) return;
+
+      setPaperScanDrafts(drafts);
+      setPaperScanStatus('review');
     } catch (err) {
-      setPhotoError(err instanceof Error ? err.message : '无法读取所选照片，请重新尝试');
+      if (requestId !== aiScanRequestIdRef.current) return;
+      setPaperScanError(
+        err instanceof Error ? err.message : '识别纸质记录失败，请重新拍照或检查网络'
+      );
+      setPaperScanStatus('error');
     }
   };
 
@@ -242,14 +283,13 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
     } else {
       records.forEach((rec) => onAddFeeding(rec));
     }
+    setIsPaperScanOpen(false);
+    setPaperScanPhotoUrl(null);
+    setPaperScanDrafts([]);
+    setPaperScanError(null);
     void hapticSuccess();
     onChangeMode('timeline');
     showToast(`已成功存入 ${records.length} 条纸质记录`);
-  };
-
-  const handleClearPhoto = () => {
-    setCapturedPhotoUrl(null);
-    setPhotoError(null);
   };
 
   const handleKeypadPress = (key: string) => {
@@ -303,7 +343,6 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
       time: formTime || getCurrentTimeStr(),
       type,
       note: formNote.trim() || undefined,
-      photoUrl: capturedPhotoUrl || undefined,
       recorder: formRecorder || currentRecorder || state.profile.recorders[0] || '妈妈',
       updatedAt: new Date().toISOString(),
       ...extra,
@@ -311,7 +350,6 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
 
     onAddFeeding(record);
     setFormNote('');
-    handleClearPhoto();
     onChangeMode('timeline');
   };
 
@@ -496,6 +534,25 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
 
   return (
     <div className="relative flex min-h-full w-full min-w-0 max-w-full flex-col overflow-x-clip">
+      {/* 顶层隐藏文件输入：确保在任意视图直接调起 iPhone 原生相机 / 相册拍照识别，绝不放在弹窗内 */}
+      <input
+        ref={aiScanCameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleAiScanFileChange}
+        className="hidden"
+        aria-hidden="true"
+      />
+      <input
+        ref={aiScanAlbumInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleAiScanFileChange}
+        className="hidden"
+        aria-hidden="true"
+      />
+
       {/* 宇宙星空底层背景 */}
       <div
         className="pointer-events-none absolute inset-0 bg-cover bg-top opacity-80"
@@ -544,7 +601,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
       {/* 3.3 帮助提示气泡 */}
       {mode === 'form' && showFormHelp && (
         <div className="relative z-20 mx-4 mb-2 rounded-[20px] border border-amber-200/30 bg-[#132552]/92 px-3.5 py-2.5 text-[11.5px] leading-relaxed text-amber-100/95 shadow-[0_10px_24px_rgba(3,8,24,0.4)] backdrop-blur-md">
-          <strong>源泉</strong>用于记录配方奶量，<strong>能量瓶</strong>用于母乳（支持瓶喂 ml 或亲喂时长），<strong>晨露</strong>用于辅食与维生素等营养品；点击上方「拍照记录」可附带现场照片留档并读取拍摄时间。
+          <strong>源泉</strong>用于记录配方奶量，<strong>能量瓶</strong>用于母乳（支持瓶喂 ml 或亲喂时长），<strong>晨露</strong>用于辅食与维生素等营养品；点击上方「拍照识别记录本」可直接拍摄保姆手写本，自动识别多条喂奶与大小便记录。
         </div>
       )}
 
@@ -594,25 +651,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
           onSubmit={handleSubmitForm}
           className="relative z-10 flex flex-1 flex-col justify-between gap-3.5 px-4 pb-safe pt-1"
         >
-          {/* 真实相机拍照输入（移动端直接调起后置摄像头） */}
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handlePhotoFileChange}
-            className="hidden"
-          />
-          {/* 真实系统相册选图输入 */}
-          <input
-            ref={galleryInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handlePhotoFileChange}
-            className="hidden"
-          />
-
-          {/* 1. 顶部「扫描纸质本（iOS 实况文本批量导入）」与可选现场照片留档卡片 */}
+          {/* 1. 顶部「拍照识别记录本」快捷卡片 */}
           <div className="space-y-2">
             <div className="relative">
               {/* 左上角点缀发光小黄星 */}
@@ -624,56 +663,31 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
               />
               <div className="diary-paper-card flex w-full items-center justify-between gap-2 px-2.5 py-1.5">
                 <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                  {capturedPhotoUrl ? (
-                    <div className="relative shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setLightboxPhotoUrl(capturedPhotoUrl)}
-                        className="block h-11 w-11 overflow-hidden rounded-xl border-2 border-amber-300/90 bg-[#f6ecd7] shadow-xs transition-transform active:scale-95"
-                        aria-label="点击放大查看附带照片"
-                      >
-                        <img
-                          src={capturedPhotoUrl}
-                          alt="已附带喂养照片"
-                          className="h-full w-full object-cover"
-                        />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleClearPhoto}
-                        aria-label="移除照片"
-                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#182848] text-white shadow-xs transition-transform active:scale-90"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setIsPaperScanOpen(true)}
-                      className="shrink-0 transition-transform active:scale-95"
-                      aria-label="打开扫描纸质本导入"
-                    >
-                      <AssetSlot slotName="feed_ocr_camera" showSlotTag={showSlotTag} className="shrink-0">
-                        <img
-                          src="./assets/extracted/feed_icon_camera.png"
-                          alt="扫描纸质本"
-                          referrerPolicy="no-referrer"
-                          className="h-10 w-11 object-contain"
-                        />
-                      </AssetSlot>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={triggerAiScanCamera}
+                    className="shrink-0 transition-transform active:scale-95"
+                    aria-label="拍照识别纸质记录本"
+                  >
+                    <AssetSlot slotName="feed_ocr_camera" showSlotTag={showSlotTag} className="shrink-0">
+                      <img
+                        src="./assets/extracted/feed_icon_camera.png"
+                        alt="拍照识别记录本"
+                        referrerPolicy="no-referrer"
+                        className="h-10 w-11 object-contain"
+                      />
+                    </AssetSlot>
+                  </button>
 
                   <div
-                    onClick={() => setIsPaperScanOpen(true)}
+                    onClick={triggerAiScanCamera}
                     className="min-w-0 flex-1 cursor-pointer"
                   >
                     <div className="text-[14.5px] font-bold leading-snug text-[#182848]">
-                      扫描纸质本导入
+                      拍照识别记录本
                     </div>
                     <div className="truncate text-[11px] text-[#6d6256]">
-                      iOS 实况文本批量识字，自动拆分喂奶与大小便
+                      一键拍保姆手写本，自动识别喂奶与大小便
                     </div>
                   </div>
                 </div>
@@ -681,26 +695,17 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                 <div className="flex shrink-0 items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => setIsPaperScanOpen(true)}
+                    onClick={triggerAiScanCamera}
                     className="inline-flex items-center gap-1 rounded-full bg-gradient-to-b from-[#fde074] to-[#f4bd36] px-2.5 py-1.5 text-[12px] font-bold text-[#182848] shadow-[0_2px_8px_rgba(244,189,54,0.35)] transition-transform active:scale-95"
                   >
-                    <ScanText className="h-3.5 w-3.5" />
-                    <span>扫描纸质本</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => cameraInputRef.current?.click()}
-                    title="附带单条记录现场照片"
-                    aria-label="附带照片留档"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#dfd1b5] bg-[#f7eedc] text-[#4e463e] transition-transform active:scale-95"
-                  >
                     <Camera className="h-3.5 w-3.5" />
+                    <span>拍照识别</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => galleryInputRef.current?.click()}
-                    title="从相册附带照片"
-                    aria-label="从相册选择照片"
+                    onClick={triggerAiScanAlbum}
+                    title="从相册选择纸质记录照片识别"
+                    aria-label="从相册选择记录本照片识别"
                     className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#dfd1b5] bg-[#f7eedc] text-[#4e463e] transition-transform active:scale-95"
                   >
                     <ImageIcon className="h-3.5 w-3.5" />
@@ -708,12 +713,6 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                 </div>
               </div>
             </div>
-
-            {photoError && (
-              <div className="rounded-2xl border border-rose-200 bg-[#fdeaea] px-3 py-2 text-[12px] text-[#6d1f26]">
-                {photoError}
-              </div>
-            )}
           </div>
 
           {/* 2. 三段式文件夹 Tab（源泉 / 能量瓶 / 晨露）+ 米白撕纸录入卡片 */}
@@ -1109,11 +1108,11 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setIsPaperScanOpen(true)}
+                onClick={triggerAiScanCamera}
                 className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-full border border-amber-200/60 bg-[#142758]/90 px-4 py-2.5 text-[13.5px] font-bold text-amber-100 shadow-[0_8px_22px_rgba(3,9,28,0.5)] backdrop-blur-md transition-transform active:scale-95"
               >
-                <ScanText className="h-4 w-4 text-amber-300" />
-                <span>扫描纸质本</span>
+                <Camera className="h-4 w-4 text-amber-300" />
+                <span>拍照识别记录本</span>
               </button>
             </div>
           </div>
@@ -1466,11 +1465,20 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => setIsPaperScanOpen(true)}
+                    onClick={triggerAiScanCamera}
                     className="inline-flex items-center gap-1 rounded-full border border-[#decba7] bg-[#fffaf0] px-2.5 py-1 typo-badge font-semibold text-[#182848] shadow-2xs transition-transform active:scale-95"
                   >
-                    <ScanText className="h-3.5 w-3.5 text-[#d97706]" />
-                    <span>扫描纸质本</span>
+                    <Camera className="h-3.5 w-3.5 text-[#d97706]" />
+                    <span>拍照识别记录本</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={triggerAiScanAlbum}
+                    title="从相册选图识别"
+                    aria-label="从相册选择记录本照片识别"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#decba7] bg-[#fffaf0] text-[#7a5b28] shadow-2xs transition-transform active:scale-95"
+                  >
+                    <ImageIcon className="h-3.5 w-3.5" />
                   </button>
                   <button
                     type="button"
@@ -1596,12 +1604,19 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
         </div>
       )}
 
-      {/* iOS 原生实况文本「扫描纸质本」底部抽屉 */}
+      {/* 拍照识别纸质记录本：加载状态 & 可编辑核对卡片底部抽屉 */}
       <PaperLogScanSheet
         open={isPaperScanOpen}
+        status={paperScanStatus}
         selectedDate={selectedDate}
         recorder={formRecorder || currentRecorder || state.profile.recorders[0] || '妈妈'}
-        onClose={() => setIsPaperScanOpen(false)}
+        photoDataUrl={paperScanPhotoUrl}
+        initialDrafts={paperScanDrafts}
+        errorMessage={paperScanError}
+        onClose={handleClosePaperScan}
+        onRetakeCamera={triggerAiScanCamera}
+        onPickAlbum={triggerAiScanAlbum}
+        onSwitchToReview={() => setPaperScanStatus('review')}
         onConfirmImport={handleConfirmPaperImport}
       />
 

@@ -13,6 +13,7 @@ export interface PaperLogDraft {
   type: PaperLogItemType;
   /** 配方奶/瓶喂母乳 -> ml；亲喂 -> 分钟；大便/小便 -> 次 */
   value: number;
+  note?: string;
   rawLine?: string;
 }
 
@@ -395,12 +396,14 @@ export function convertPaperDraftsToFeedingRecords(
       updatedAt,
     };
 
+    const customNote = draft.note?.trim();
+
     if (draft.type === 'formula') {
       return {
         ...base,
         type: 'formula',
         amountMl: Math.max(1, Math.round(draft.value || 120)),
-        note: '纸质本扫码导入',
+        note: customNote || '拍照识别导入',
       };
     }
 
@@ -409,7 +412,7 @@ export function convertPaperDraftsToFeedingRecords(
         ...base,
         type: 'breast',
         amountMl: Math.max(1, Math.round(draft.value || 100)),
-        note: '瓶喂母乳 · 纸质本导入',
+        note: customNote ? `瓶喂母乳 · ${customNote}` : '瓶喂母乳 · 拍照识别导入',
       };
     }
 
@@ -419,7 +422,7 @@ export function convertPaperDraftsToFeedingRecords(
         type: 'breast',
         durationMin: Math.max(1, Math.round(draft.value || 15)),
         breastSide: 'both',
-        note: '亲喂 · 纸质本导入',
+        note: customNote ? `亲喂 · ${customNote}` : '亲喂 · 拍照识别导入',
       };
     }
 
@@ -428,7 +431,7 @@ export function convertPaperDraftsToFeedingRecords(
         ...base,
         type: 'poop',
         count: Math.max(1, Math.round(draft.value || 1)),
-        note: '纸质本扫码导入',
+        note: customNote || '拍照识别导入',
       };
     }
 
@@ -436,7 +439,7 @@ export function convertPaperDraftsToFeedingRecords(
       ...base,
       type: 'pee',
       count: Math.max(1, Math.round(draft.value || 1)),
-      note: '纸质本扫码导入',
+      note: customNote || '拍照识别导入',
     };
   });
 }
