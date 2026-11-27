@@ -202,30 +202,34 @@ export default defineConfig(() => {
           type: 'module',
         },
       }),
-      // Local dev middleware for Vercel Serverless Function /api/recognize
+      // Local dev middleware for Vercel Serverless Functions (/api/recognize, /api/polish)
       {
-        name: 'local-api-recognize',
+        name: 'local-vercel-api',
         configureServer(server) {
-          server.middlewares.use('/api/recognize', async (req, res, next) => {
-            try {
-              const mod = await server.ssrLoadModule('/api/recognize.ts');
-              const handler = mod?.default;
-              if (typeof handler === 'function') {
-                await handler(req, res);
+          const mountLocalApi = (route: string, modulePath: string) => {
+            server.middlewares.use(route, async (req, res, next) => {
+              try {
+                const mod = await server.ssrLoadModule(modulePath);
+                const handler = mod?.default;
+                if (typeof handler === 'function') {
+                  await handler(req, res);
+                  return;
+                }
+              } catch (err) {
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(
+                  JSON.stringify({
+                    error: err instanceof Error ? err.message : '本地接口初始化失败',
+                  }),
+                );
                 return;
               }
-            } catch (err) {
-              res.statusCode = 500;
-              res.setHeader('Content-Type', 'application/json; charset=utf-8');
-              res.end(
-                JSON.stringify({
-                  error: err instanceof Error ? err.message : '本地识别接口初始化失败',
-                }),
-              );
-              return;
-            }
-            next();
-          });
+              next();
+            });
+          };
+          mountLocalApi('/api/recognize', '/api/recognize.ts');
+          mountLocalApi('/api/polish', '/api/polish.ts');
         },
       },
       // Auto-generates /fonts/custom-fonts.css and inlines @font-face + preload into index.html in both dev and build.

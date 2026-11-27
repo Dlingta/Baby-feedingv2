@@ -1,10 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Calendar, ChevronRight, Mic, Pencil, Trash2, User, X } from 'lucide-react';
+import {
+  Calendar,
+  ChevronRight,
+  Loader2,
+  Mic,
+  Pencil,
+  RotateCcw,
+  Sparkles,
+  Square,
+  Trash2,
+  User,
+  X,
+} from 'lucide-react';
 import { DiaryEntry, DiaryMood, DiaryWeather, PlanetAppState } from '../types/planet';
 import { calculatePlanetAge, getTodayDateStr } from '../data/initialData';
 import { AssetSlot, IconStar } from '../components/Illustrations';
 import { CosmicModuleHeader, CosmicSubHeader } from '../components/CosmicModuleHeader';
-import { hapticTap, speechBridge } from '../native/iosBridge';
+import { hapticSuccess, hapticTap, speechBridge } from '../native/iosBridge';
+import { polishDiaryTextViaApi } from '../utils/diaryPolish';
 
 export type DiaryViewMode = 'list' | 'detail' | 'empty' | 'form';
 
@@ -39,7 +52,7 @@ interface BrowserSpeechRecognitionLike {
   continuous: boolean;
   interimResults: boolean;
   onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
   onend: (() => void) | null;
   start(): void;
   stop(): void;
@@ -84,13 +97,27 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
   const [formReflection, setFormReflection] = useState('');
   const [formPhotos, setFormPhotos] = useState<string[]>([]);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
-  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
+  const [isPolishing, setIsPolishing] = useState(false);
+  const [prePolishText, setPrePolishText] = useState<string | null>(null);
+  const [voiceNotice, setVoiceNotice] = useState<{
+    tone: 'info' | 'success' | 'error';
+    text: string;
+  } | null>(null);
   const stopVoiceRef = useRef<(() => Promise<void> | void) | null>(null);
   const voiceBaseTextRef = useRef<string>('');
+  const latestContentRef = useRef<string>('');
+  const polishRequestIdRef = useRef<number>(0);
+  const intentionalStopRef = useRef<boolean>(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    latestContentRef.current = formContent;
+  }, [formContent]);
+
+  useEffect(() => {
     return () => {
+      polishRequestIdRef.current += 1;
       const stopFn = stopVoiceRef.current;
       stopVoiceRef.current = null;
       if (stopFn) {
@@ -99,7 +126,13 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
     };
   }, []);
 
+  const updateFormContent = (nextText: string) => {
+    latestContentRef.current = nextText;
+    setFormContent(nextText);
+  };
+
   const stopVoiceDictation = async () => {
+    intentionalStopRef.current = true;
     const stopFn = stopVoiceRef.current;
     stopVoiceRef.current = null;
     setIsRecordingVoice(false);
@@ -108,7 +141,53 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
     }
   };
 
+  const runPolishText = async (sourceText: string) => {
+    const trimmed = sourceText.trim();
+    if (!trimmed) {
+      setVoiceNotice({
+        tone: 'info',
+        text: '请先说出或输入一些日记内容，再点击整理语气词哦～',
+      });
+      return;
+    }
+
+    const reqId = ++polishRequestIdRef.current;
+    setIsPolishing(true);
+    setVoiceNotice({ tone: 'info', text: '正在整理语气词…' });
+
+    try {
+      const polished = await polishDiaryTextViaApi(trimmed);
+      if (reqId !== polishRequestIdRef.current) return;
+
+      if (polished && polished !== trimmed) {
+        setPrePolishText(sourceText);
+        updateFormContent(polished);
+        void hapticSuccess();
+        setVoiceNotice({
+          tone: 'success',
+          text: '已帮你去除语气词并补全标点，不满意可点下方「撤销整理」还原',
+        });
+      } else {
+        setVoiceNotice({
+          tone: 'success',
+          text: '这段日记已经很自然通顺啦，无需改动～',
+        });
+      }
+    } catch (err) {
+      if (reqId !== polishRequestIdRef.current) return;
+      setVoiceNotice({
+        tone: 'error',
+        text: err instanceof Error ? err.message : '整理语气词失败，已保留原口述内容',
+      });
+    } finally {
+      if (reqId === polishRequestIdRef.current) {
+        setIsPolishing(false);
+      }
+    }
+  };
+
   const openCreateForm = () => {
+    polishRequestIdRef.current += 1;
     void stopVoiceDictation();
     setEditingId(null);
     setReturnToDetailAfterForm(false);
@@ -116,14 +195,17 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
     setFormMood('glowing');
     setFormWeather('sunny');
     setFormRecorder(currentRecorder || state.profile.recorders[0] || '妈妈');
-    setFormContent('');
+    updateFormContent('');
     setFormReflection('');
     setFormPhotos([]);
+    setIsPolishing(false);
+    setPrePolishText(null);
     setVoiceNotice(null);
     onChangeMode('form');
   };
 
   const openEditForm = (entry: DiaryEntry, fromDetail = false) => {
+    polishRequestIdRef.current += 1;
     void stopVoiceDictation();
     setEditingId(entry.id);
     setReturnToDetailAfterForm(fromDetail);
@@ -131,9 +213,11 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
     setFormMood(entry.mood);
     setFormWeather(entry.weather);
     setFormRecorder(entry.recorder);
-    setFormContent(entry.content);
+    updateFormContent(entry.content);
     setFormReflection(entry.reflection || '');
     setFormPhotos(entry.photos);
+    setIsPolishing(false);
+    setPrePolishText(null);
     setVoiceNotice(null);
     onChangeMode('form');
   };
@@ -145,23 +229,41 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
   };
 
   const handleToggleVoice = async () => {
+    if (isPolishing) return;
     hapticTap();
-    setVoiceNotice(null);
 
+    // 正在录音 -> 点击「说完了，自动整理」：停止录音并自动发送至 /api/polish
     if (isRecordingVoice) {
       await stopVoiceDictation();
+      // 给浏览器语音识别 220ms 缓冲，确保最后一句临时识别结果也写入输入框
+      await new Promise((resolve) => window.setTimeout(resolve, 220));
+      const spokenText = latestContentRef.current.trim();
+      if (!spokenText) {
+        setVoiceNotice({
+          tone: 'info',
+          text: '刚才没有识别到语音内容，可以再试一次或直接用键盘输入哦',
+        });
+        return;
+      }
+      await runPolishText(latestContentRef.current);
       return;
     }
 
-    voiceBaseTextRef.current = formContent.trim();
+    setVoiceNotice(null);
+    setPrePolishText(null);
+    intentionalStopRef.current = false;
+    voiceBaseTextRef.current = latestContentRef.current.trim();
 
     // 1. 原生 iOS App：调用苹果端侧 Speech 框架离线中文语音转文字
     if (speechBridge.isNativeAvailable()) {
       try {
         setIsRecordingVoice(true);
         const stopNative = await speechBridge.startNative((text, isFinal) => {
-          const prefix = voiceBaseTextRef.current;
-          setFormContent(prefix ? `${prefix}\n${text}` : text);
+          const cleaned = text.trim();
+          if (cleaned) {
+            const prefix = voiceBaseTextRef.current;
+            updateFormContent(prefix ? `${prefix}\n${cleaned}` : cleaned);
+          }
           if (isFinal) {
             setIsRecordingVoice(false);
             stopVoiceRef.current = null;
@@ -171,19 +273,26 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
         return;
       } catch (err) {
         setIsRecordingVoice(false);
-        setVoiceNotice(err instanceof Error ? err.message : '请在 iPhone 设置中允许语音识别与麦克风权限');
+        setVoiceNotice({
+          tone: 'error',
+          text: err instanceof Error ? err.message : '请在 iPhone 设置中允许语音识别与麦克风权限',
+        });
         return;
       }
     }
 
-    // 2. 浏览器预览兜底：真实 Web Speech API（不使用假文案）
+    // 2. 浏览器原生 Web Speech API (zh-CN, continuous, interimResults)
     const speechWindow = window as unknown as {
       SpeechRecognition?: new () => BrowserSpeechRecognitionLike;
       webkitSpeechRecognition?: new () => BrowserSpeechRecognitionLike;
     };
     const SpeechCtor = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
     if (!SpeechCtor) {
-      setVoiceNotice('当前浏览器暂不支持语音转文字，在 iPhone 原生 App 中会自动调用 Apple Speech 离线识别');
+      setVoiceNotice({
+        tone: 'info',
+        text: '可直接点击 iPhone 键盘右下角的麦克风图标进行听写，说完后点「✨ 整理语气词」即可',
+      });
+      textareaRef.current?.focus();
       return;
     }
 
@@ -200,13 +309,26 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
         const cleaned = spoken.trim();
         if (cleaned) {
           const prefix = voiceBaseTextRef.current;
-          setFormContent(prefix ? `${prefix}\n${cleaned}` : cleaned);
+          updateFormContent(prefix ? `${prefix}\n${cleaned}` : cleaned);
         }
       };
-      recognition.onerror = () => {
+      recognition.onerror = (event) => {
+        if (intentionalStopRef.current && event?.error === 'aborted') {
+          return;
+        }
         setIsRecordingVoice(false);
         stopVoiceRef.current = null;
-        setVoiceNotice('未获取到麦克风声音，请检查麦克风权限后重试');
+        if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
+          setVoiceNotice({
+            tone: 'error',
+            text: '未开启麦克风权限，也可以直接点 iPhone 键盘右下角的麦克风图标听写，再用「✨ 整理语气词」',
+          });
+        } else {
+          setVoiceNotice({
+            tone: 'info',
+            text: '未能持续识别声音，可重试或点 iPhone 键盘右下角麦克风听写后使用「✨ 整理语气词」',
+          });
+        }
       };
       recognition.onend = () => {
         setIsRecordingVoice(false);
@@ -223,8 +345,33 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
       };
     } catch {
       setIsRecordingVoice(false);
-      setVoiceNotice('启动语音输入失败，请检查麦克风权限');
+      setVoiceNotice({
+        tone: 'info',
+        text: '可直接点击 iPhone 键盘右下角的麦克风图标进行听写，说完后点「✨ 整理语气词」即可',
+      });
+      textareaRef.current?.focus();
     }
+  };
+
+  const handleManualPolish = async () => {
+    if (isPolishing) return;
+    hapticTap();
+    if (isRecordingVoice) {
+      await stopVoiceDictation();
+      await new Promise((resolve) => window.setTimeout(resolve, 180));
+    }
+    await runPolishText(latestContentRef.current);
+  };
+
+  const handleUndoPolish = () => {
+    if (prePolishText === null) return;
+    hapticTap();
+    updateFormContent(prePolishText);
+    setPrePolishText(null);
+    setVoiceNotice({
+      tone: 'info',
+      text: '已恢复原始口述稿',
+    });
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -245,6 +392,9 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
   const handleSaveEntry = () => {
     if (!formContent.trim()) return;
     void stopVoiceDictation();
+    polishRequestIdRef.current += 1;
+    setIsPolishing(false);
+    setPrePolishText(null);
     const entry: DiaryEntry = {
       id: editingId || `diary-${Date.now()}`,
       date: formDate,
@@ -336,7 +486,12 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
       ) : mode === 'form' ? (
         <CosmicSubHeader
           title={editingId ? '编辑今日的星光' : '写下今日的星光'}
-          onBack={() => onChangeMode(returnToDetailAfterForm ? 'detail' : 'list')}
+          onBack={() => {
+            polishRequestIdRef.current += 1;
+            setIsPolishing(false);
+            void stopVoiceDictation();
+            onChangeMode(returnToDetailAfterForm ? 'detail' : 'list');
+          }}
           backLabel="返回"
           rightSlot={
             <button
@@ -692,46 +847,118 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
                 </div>
               </div>
 
-              {/* ☆ 记录内容 (内置右下角圆形语音麦克风按钮) */}
+              {/* ☆ 记录内容 + 语音记日记 & 自动去除语气词 */}
               <div>
-                <div className="mb-1.5 flex items-center justify-between">
+                <div className="mb-1.5 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 text-[14px] font-bold text-[#182848]">
                     <IconStar className="h-4.5 w-4.5" />
                     <span>记录内容</span>
                   </div>
+
                   {isRecordingVoice && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-200/90 px-2.5 py-0.5 text-[11px] font-bold text-amber-900 animate-pulse">
-                      正在捕捉宇宙电波…
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100/95 px-2.5 py-0.5 text-[11px] font-bold text-rose-700">
+                      <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
+                      <span>正在聆听你的声音…</span>
+                    </span>
+                  )}
+
+                  {!isRecordingVoice && isPolishing && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-200/90 px-2.5 py-0.5 text-[11px] font-bold text-amber-900">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span>正在整理语气词…</span>
                     </span>
                   )}
                 </div>
 
-                <div className="relative rounded-2xl bg-[#f1e7d2]/85 p-3">
+                <div
+                  className={`relative rounded-2xl p-3 transition-all ${
+                    isRecordingVoice
+                      ? 'bg-[#fff7e2] ring-2 ring-[#f4bd36]/85 shadow-[0_0_16px_rgba(249,207,76,0.28)]'
+                      : 'bg-[#f1e7d2]/85'
+                  }`}
+                >
                   <textarea
-                    rows={4}
+                    ref={textareaRef}
+                    rows={5}
                     value={formContent}
-                    onChange={(e) => setFormContent(e.target.value)}
-                    placeholder={'今天发生了什么呢？\n把这份星光记录下来吧～'}
-                    className="w-full resize-none bg-transparent pr-10 text-[13.5px] leading-relaxed text-[#182848] placeholder:text-[#9c8e7c] focus:outline-none"
+                    onChange={(e) => updateFormContent(e.target.value)}
+                    placeholder={'今天发生了什么呢？\n可以直接点下方「语音记日记」开口说，说完自动帮你去掉语气词～'}
+                    className="w-full resize-none bg-transparent text-[13.5px] leading-relaxed text-[#182848] placeholder:text-[#9c8e7c] focus:outline-none"
                     required
                   />
+                </div>
+
+                {/* 语音记日记主按钮 + 辅助「✨ 整理语气词」按钮 */}
+                <div className="mt-2.5 flex items-center gap-2">
                   <button
                     type="button"
+                    disabled={isPolishing}
                     onClick={handleToggleVoice}
-                    aria-label={isRecordingVoice ? '结束语音转写' : '语音录入'}
-                    title={isRecordingVoice ? '点击完成转写' : '点击语音转文字'}
-                    className={`absolute bottom-2.5 right-2.5 flex h-9 w-9 items-center justify-center rounded-full shadow-xs transition-all active:scale-95 ${
+                    className={`flex min-h-[42px] flex-1 items-center justify-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-bold transition-all active:scale-[0.98] disabled:opacity-55 ${
                       isRecordingVoice
-                        ? 'bg-amber-400 text-[#182848] ring-4 ring-amber-300/45'
-                        : 'bg-[#dfd5c3] text-[#55504a] hover:bg-[#d5c8b2]'
+                        ? 'border border-rose-300 bg-gradient-to-b from-[#ff886b] to-[#e95d46] text-white shadow-[0_5px_14px_rgba(233,93,70,0.35)]'
+                        : 'border border-[#f1c44d] bg-gradient-to-b from-[#fde382] to-[#f4c03c] text-[#182848] shadow-[0_4px_12px_rgba(244,192,60,0.32)]'
                     }`}
                   >
-                    <Mic className="h-4.5 w-4.5" />
+                    {isRecordingVoice ? (
+                      <>
+                        <Square className="h-3.5 w-3.5 fill-current" />
+                        <span>说完了，自动整理</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="h-4 w-4 stroke-[2.2]" />
+                        <span>语音记日记</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isPolishing || isRecordingVoice || !formContent.trim()}
+                    onClick={handleManualPolish}
+                    className="flex min-h-[42px] shrink-0 items-center justify-center gap-1 rounded-full border border-[#dcc8a0] bg-[#fffaf0] px-3.5 py-2 text-[12.5px] font-bold text-[#5d441f] shadow-2xs transition-all hover:bg-[#fbf1dc] active:scale-95 disabled:opacity-45"
+                  >
+                    {isPolishing ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-[#d97706]" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5 text-[#d97706]" />
+                    )}
+                    <span>{isPolishing ? '整理中…' : '整理语气词'}</span>
                   </button>
                 </div>
+
+                {/* 撤销整理按钮：整理完成后一键还原原始口述稿 */}
+                {prePolishText !== null && !isRecordingVoice && !isPolishing && (
+                  <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-[#e5d5b4] bg-[#faf2e0] px-2.5 py-1.5">
+                    <span className="text-[11.5px] text-[#6d5f4d]">
+                      更喜欢刚才的原话吗？可一键还原
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleUndoPolish}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#d9c49b] bg-white px-2.5 py-1 text-[11.5px] font-bold text-[#182848] shadow-2xs transition-transform active:scale-95"
+                    >
+                      <RotateCcw className="h-3 w-3 text-[#8c6426]" />
+                      <span>撤销整理</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* 轻提示区域（录音状态 / 正在整理语气词 / iPhone 键盘听写兼容提示 / 错误兜底） */}
                 {voiceNotice && (
-                  <p className="mt-1.5 rounded-xl bg-amber-100/80 px-2.5 py-1.5 text-[11.5px] text-amber-900">
-                    {voiceNotice}
+                  <p
+                    role="status"
+                    aria-live="polite"
+                    className={`mt-2 rounded-xl px-3 py-2 text-[11.5px] leading-relaxed ${
+                      voiceNotice.tone === 'error'
+                        ? 'border border-rose-200 bg-rose-50 text-rose-800'
+                        : voiceNotice.tone === 'success'
+                        ? 'border border-emerald-200 bg-emerald-50/90 text-emerald-900'
+                        : 'border border-amber-200/80 bg-amber-100/75 text-amber-950'
+                    }`}
+                  >
+                    {voiceNotice.text}
                   </p>
                 )}
 
@@ -741,7 +968,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
                   value={formReflection}
                   onChange={(e) => setFormReflection(e.target.value)}
                   placeholder="补一句小小感想（选填，将展示在日记详情底部）"
-                  className="mt-2 w-full rounded-xl bg-[#f1e7d2]/60 px-3 py-2 text-[12.5px] text-[#182848] placeholder:text-[#9c8e7c] focus:bg-[#f1e7d2]/90 focus:outline-none"
+                  className="mt-2.5 w-full rounded-xl bg-[#f1e7d2]/60 px-3 py-2 text-[12.5px] text-[#182848] placeholder:text-[#9c8e7c] focus:bg-[#f1e7d2]/90 focus:outline-none"
                 />
               </div>
 

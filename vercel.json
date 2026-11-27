@@ -2,6 +2,9 @@
   "functions": {
     "api/recognize.ts": {
       "maxDuration": 30
+    },
+    "api/polish.ts": {
+      "maxDuration": 30
     }
   }
 }
