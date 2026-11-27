@@ -378,7 +378,8 @@ export function parsePaperLogText(rawText: string, fallbackTime: string): PaperL
 export function convertPaperDraftsToFeedingRecords(
   drafts: PaperLogDraft[],
   selectedDate: string,
-  recorder: string
+  recorder: string,
+  photoUrl?: string | null
 ): FeedingRecord[] {
   const nowTs = Date.now();
   const updatedAt = new Date().toISOString();
@@ -390,6 +391,7 @@ export function convertPaperDraftsToFeedingRecords(
       date: selectedDate,
       time: safeTime,
       recorder: recorder || '妈妈',
+      photoUrl: idx === 0 && photoUrl ? photoUrl : undefined,
       updatedAt,
     };
 
