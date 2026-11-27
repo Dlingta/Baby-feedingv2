@@ -103,7 +103,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       : 'text-[23px]';
 
   const todayDiariesCount = state.diaries.length;
-  const todayFeedingsCount = state.feedings.filter((f) => f.date === todayDate).length;
+  const todayFeedingsCount = state.feedings.filter(
+    (f) => f.date === todayDate && f.type !== 'poop' && f.type !== 'pee'
+  ).length;
   const hasTodayGrowth = state.growths.some((g) => g.date === todayDate);
   const activatedCount = state.vaccines.filter((v) => v.status === 'activated').length;
   const nextVaccine =

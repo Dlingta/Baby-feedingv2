@@ -165,23 +165,8 @@ export default defineConfig(() => {
           clientsClaim: true,
           cleanupOutdatedCaches: true,
           globPatterns: ['**/*.{js,css,html,woff2}'],
-          globIgnores: ['ocr/**'],
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           runtimeCaching: [
-            {
-              urlPattern: /\/ocr\/.*/i,
-              handler: 'CacheFirst',
-              options: {
-                cacheName: 'planet-local-ocr-cache',
-                expiration: {
-                  maxEntries: 10,
-                  maxAgeSeconds: 60 * 60 * 24 * 365,
-                },
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
-            },
             {
               urlPattern: /\/assets\/.*\.(?:png|jpg|jpeg|svg|webp)$/i,
               handler: 'CacheFirst',

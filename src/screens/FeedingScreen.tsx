@@ -1,19 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertCircle,
   Camera,
   Check,
   ChevronLeft,
   ChevronRight,
   Clock,
   Delete,
+  Droplets,
   Image as ImageIcon,
-  Loader2,
   Pencil,
   Plus,
-  RefreshCw,
   ScanText,
-  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
@@ -25,14 +22,9 @@ import {
   CosmicSubHeader,
   HandDrawnInfoIcon,
 } from '../components/CosmicModuleHeader';
-import {
-  processFeedingPhotoFile,
-  recognizeFeedingPhotoLocally,
-} from '../utils/feedingPhoto';
-import {
-  parseFeedingOcrText,
-  type ParsedFeedingDraft,
-} from '../utils/feedingOcrParser';
+import { PaperLogScanSheet } from '../components/PaperLogScanSheet';
+import { processFeedingPhotoFile } from '../utils/feedingPhoto';
+import { hapticSuccess } from '../native/iosBridge';
 
 export type FeedingViewMode = 'timeline' | 'empty' | 'form';
 type RangeOption = 'day' | 7 | 30 | 90;
@@ -115,19 +107,33 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
     setFormRecorder(currentRecorder || state.profile.recorders[0] || '妈妈');
   }, [currentRecorder, state.profile.recorders]);
 
-  // 本地离线 OCR 扫描纸质喂养记录状态（100% 浏览器本地运行，零外部 API）
-  type PhotoStatus = 'idle' | 'scanning' | 'parsed' | 'no_match' | 'error';
-  const [photoStatus, setPhotoStatus] = useState<PhotoStatus>('idle');
-  const [photoMessage, setPhotoMessage] = useState('');
-  const [photoSubNote, setPhotoSubNote] = useState('');
-  const [ocrProgress, setOcrProgress] = useState(0);
-  const [ocrRawText, setOcrRawText] = useState('');
-  const [showRawTextEditor, setShowRawTextEditor] = useState(false);
-  const [ocrDrafts, setOcrDrafts] = useState<ParsedFeedingDraft[]>([]);
+  // 纸质记录扫码导入（iOS 原生实况文本 + 纯本地 JS 正则解析）与可选照片留档状态
+  const [isPaperScanOpen, setIsPaperScanOpen] = useState(false);
+  const [importToast, setImportToast] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [capturedPhotoUrl, setCapturedPhotoUrl] = useState<string | null>(null);
   const [lightboxPhotoUrl, setLightboxPhotoUrl] = useState<string | null>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const toastTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const showToast = (msg: string) => {
+    setImportToast(msg);
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => {
+      setImportToast(null);
+    }, 2800);
+  };
 
   const isEmptyView = mode === 'empty';
 
@@ -166,7 +172,13 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
       const startDate = shiftDate(endDate, -(step - 1));
       const matching = isEmptyView
         ? []
-        : state.feedings.filter((f) => f.date >= startDate && f.date <= endDate);
+        : state.feedings.filter(
+            (f) =>
+              f.date >= startDate &&
+              f.date <= endDate &&
+              f.type !== 'poop' &&
+              f.type !== 'pee'
+          );
 
       const totalMl = matching.reduce((sum, r) => sum + (r.amountMl || 0), 0);
       const totalCount = matching.length;
@@ -192,157 +204,52 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
     });
   }, [state.feedings, selectedDate, isEmptyView, showAllRecords]);
 
-  const applyDraftToForm = (draft: ParsedFeedingDraft) => {
-    setFormTime(draft.time || getCurrentTimeStr());
-    if (draft.type === 'formula') {
-      setActiveFormTab('source');
-      if (draft.amountMl) setMlStr(String(draft.amountMl));
-    } else if (draft.type === 'breast') {
-      setActiveFormTab('energy');
-      if (draft.breastSide) setBreastSide(draft.breastSide);
-      if (draft.amountMl) {
-        setBreastUnit('ml');
-        setBreastValStr(String(draft.amountMl));
-      } else if (draft.durationMin) {
-        setBreastUnit('min');
-        setBreastValStr(String(draft.durationMin));
-      }
-    } else {
-      setActiveFormTab('dew');
-      setDewSubType(draft.type);
-      if (draft.foodName) setFoodName(draft.foodName);
-      if (draft.foodAmount) {
-        const digits = draft.foodAmount.replace(/[^\d.]/g, '');
-        if (digits) setFoodQtyStr(digits);
-      }
-    }
-  };
-
-  const formatDraftBrief = (draft: ParsedFeedingDraft): string => {
-    if (draft.type === 'formula') return `配方奶 ${draft.amountMl ?? 0}ml`;
-    if (draft.type === 'breast') {
-      const sideLabel =
-        draft.breastSide === 'left' ? '左' : draft.breastSide === 'right' ? '右' : '双侧';
-      return draft.amountMl
-        ? `母乳 ${draft.amountMl}ml`
-        : `母乳亲喂 ${sideLabel}${draft.durationMin ?? 0}分钟`;
-    }
-    return `${draft.foodName || (draft.type === 'supplement' ? '营养品' : '辅食')} ${draft.foodAmount || ''}`.trim();
-  };
-
-  const applyParsedDrafts = (drafts: ParsedFeedingDraft[], rawText: string) => {
-    setOcrDrafts(drafts);
-    if (drafts.length === 1) {
-      applyDraftToForm(drafts[0]);
-      setPhotoStatus('parsed');
-      setPhotoMessage(`本地识别成功：${drafts[0].time} · ${formatDraftBrief(drafts[0])}`);
-      setPhotoSubNote('已自动填入下方表单，核对无误后点击「保存」即可录入');
-      setShowRawTextEditor(false);
-    } else if (drafts.length > 1) {
-      applyDraftToForm(drafts[0]);
-      setPhotoStatus('parsed');
-      setPhotoMessage(`本地识别到 ${drafts.length} 条纸质喂养记录`);
-      setPhotoSubNote('可在下方勾选/修改后「一键批量录入」，或任选一条填入表单');
-      setShowRawTextEditor(false);
-    } else {
-      setPhotoStatus('no_match');
-      setPhotoMessage('本地离线扫描已完成，未自动匹配到明确的「时间 + 奶量」格式');
-      setPhotoSubNote(
-        rawText
-          ? '手写体连笔时可能存在错字，可展开下方「校正识别文字」快速改字后重新解析'
-          : '未检测到清晰文字，建议光线充足、平拍纸面重拍，或点缩略图放大手动录入'
+  const dayDiaperSummary = useMemo(() => {
+    if (isEmptyView) return { poop: 0, pee: 0 };
+    return state.feedings
+      .filter((f) => f.date === selectedDate)
+      .reduce(
+        (acc, item) => {
+          if (item.type === 'poop') acc.poop += item.count ?? 1;
+          if (item.type === 'pee') acc.pee += item.count ?? 1;
+          return acc;
+        },
+        { poop: 0, pee: 0 }
       );
-      setShowRawTextEditor(Boolean(rawText));
-    }
-  };
+  }, [state.feedings, selectedDate, isEmptyView]);
 
   const handlePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    // Reset input value so the user can retake or pick the same file again
     e.target.value = '';
     if (!file) return;
 
-    setPhotoStatus('scanning');
-    setOcrProgress(5);
-    setPhotoMessage('正在处理照片并增强纸面对比度…');
-    setPhotoSubNote('纯本地离线识别，不上传云端、不调用任何外部 API');
-    setOcrDrafts([]);
-    setOcrRawText('');
-    setShowRawTextEditor(false);
-
+    setPhotoError(null);
     try {
       const processed = await processFeedingPhotoFile(file);
       setCapturedPhotoUrl(processed.previewDataUrl);
       if (processed.exifTime) {
         setFormTime(processed.exifTime);
       }
-
-      const ocrResult = await recognizeFeedingPhotoLocally(
-        processed,
-        processed.exifTime || formTime || getCurrentTimeStr(),
-        ({ stage, percent }) => {
-          setPhotoMessage(stage);
-          setOcrProgress(percent);
-        }
-      );
-
-      setOcrRawText(ocrResult.rawText);
-      applyParsedDrafts(ocrResult.drafts, ocrResult.rawText);
     } catch (err) {
-      setPhotoStatus('error');
-      setPhotoMessage(
-        err instanceof Error ? err.message : '本地照片识别失败，请重新拍照或手动填写'
-      );
-      setPhotoSubNote('照片已保留，可点击左侧缩略图放大核对后手动填写');
+      setPhotoError(err instanceof Error ? err.message : '无法读取所选照片，请重新尝试');
     }
   };
 
-  const handleReparseRawText = () => {
-    const nextDrafts = parseFeedingOcrText(ocrRawText, formTime || getCurrentTimeStr());
-    applyParsedDrafts(nextDrafts, ocrRawText);
-  };
-
-  const handleBatchImportDrafts = () => {
-    const selectedDrafts = ocrDrafts.filter((d) => d.selected);
-    if (selectedDrafts.length === 0) return;
-
-    const nowTs = Date.now();
-    const records: FeedingRecord[] = selectedDrafts.map((d, idx) => ({
-      id: `feed-ocr-${nowTs}-${idx}`,
-      date: selectedDate,
-      time: d.time || getCurrentTimeStr(),
-      type: d.type,
-      amountMl: d.amountMl,
-      durationMin: d.durationMin,
-      breastSide: d.breastSide,
-      foodName: d.foodName,
-      foodAmount: d.foodAmount,
-      note: d.note || '纸质记录本地扫码录入',
-      photoUrl: idx === 0 && capturedPhotoUrl ? capturedPhotoUrl : undefined,
-      recorder: formRecorder || currentRecorder || state.profile.recorders[0] || '妈妈',
-      updatedAt: new Date().toISOString(),
-    }));
-
+  const handleConfirmPaperImport = (records: FeedingRecord[]) => {
+    if (records.length === 0) return;
     if (onAddFeedings) {
       onAddFeedings(records);
     } else {
       records.forEach((rec) => onAddFeeding(rec));
     }
-
-    setFormNote('');
-    handleClearPhoto();
+    void hapticSuccess();
     onChangeMode('timeline');
+    showToast(`已成功存入 ${records.length} 条纸质记录`);
   };
 
   const handleClearPhoto = () => {
     setCapturedPhotoUrl(null);
-    setPhotoStatus('idle');
-    setPhotoMessage('');
-    setPhotoSubNote('');
-    setOcrProgress(0);
-    setOcrRawText('');
-    setOcrDrafts([]);
-    setShowRawTextEditor(false);
+    setPhotoError(null);
   };
 
   const handleKeypadPress = (key: string) => {
@@ -495,6 +402,26 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
         />
       );
     }
+    if (type === 'poop') {
+      return (
+        <span
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#d7b68a] bg-[#f3e1c3] text-[12px] font-bold text-[#7c3f0e]"
+          aria-label="大便"
+        >
+          便
+        </span>
+      );
+    }
+    if (type === 'pee') {
+      return (
+        <span
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#9fdaf0] bg-[#ddf4fc] text-[#0b7296]"
+          aria-label="小便"
+        >
+          <Droplets className="h-3.5 w-3.5" />
+        </span>
+      );
+    }
     // 营养品 (维生素/益生菌等)
     return (
       <img
@@ -516,12 +443,18 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
     if (item.type === 'supplement') {
       return `营养品 ${item.foodName || '维生素AD'} ${item.foodAmount || ''}`.trim();
     }
+    if (item.type === 'poop') {
+      return `大便 ${item.count ?? 1}次`;
+    }
+    if (item.type === 'pee') {
+      return `小便 ${item.count ?? 1}次`;
+    }
     if (item.amountMl) {
       return `母乳 ${item.amountMl}ml`;
     }
     const sideLabel =
       item.breastSide === 'left' ? '左侧' : item.breastSide === 'right' ? '右侧' : '双侧';
-    return `母乳 ${sideLabel} ${item.durationMin ?? 15}分`;
+    return `亲喂 ${sideLabel} ${item.durationMin ?? 15}分`;
   };
 
   const rangeOptions: { key: RangeOption; label: string }[] = [
@@ -679,7 +612,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
             className="hidden"
           />
 
-          {/* 1. 顶部本地离线拍照扫描卡片 + 识别结果 / 多条纸质记录批量录入面板 */}
+          {/* 1. 顶部「扫描纸质本（iOS 实况文本批量导入）」与可选现场照片留档卡片 */}
           <div className="space-y-2">
             <div className="relative">
               {/* 左上角点缀发光小黄星 */}
@@ -689,19 +622,19 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                 aria-hidden="true"
                 className="pointer-events-none absolute -top-3 left-5 z-20 h-7 w-7 object-contain drop-shadow-[0_0_8px_rgba(253,224,71,0.85)]"
               />
-              <div className="diary-paper-card flex w-full items-center justify-between gap-2.5 px-2.5 py-1.5">
+              <div className="diary-paper-card flex w-full items-center justify-between gap-2 px-2.5 py-1.5">
                 <div className="flex min-w-0 flex-1 items-center gap-2.5">
                   {capturedPhotoUrl ? (
                     <div className="relative shrink-0">
                       <button
                         type="button"
                         onClick={() => setLightboxPhotoUrl(capturedPhotoUrl)}
-                        className="block h-12 w-12 overflow-hidden rounded-xl border-2 border-amber-300/90 bg-[#f6ecd7] shadow-xs transition-transform active:scale-95"
-                        aria-label="点击放大查看拍摄照片"
+                        className="block h-11 w-11 overflow-hidden rounded-xl border-2 border-amber-300/90 bg-[#f6ecd7] shadow-xs transition-transform active:scale-95"
+                        aria-label="点击放大查看附带照片"
                       >
                         <img
                           src={capturedPhotoUrl}
-                          alt="已拍摄喂养照片"
+                          alt="已附带喂养照片"
                           className="h-full w-full object-cover"
                         />
                       </button>
@@ -717,14 +650,14 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                   ) : (
                     <button
                       type="button"
-                      onClick={() => cameraInputRef.current?.click()}
+                      onClick={() => setIsPaperScanOpen(true)}
                       className="shrink-0 transition-transform active:scale-95"
-                      aria-label="打开相机拍照扫描"
+                      aria-label="打开扫描纸质本导入"
                     >
                       <AssetSlot slotName="feed_ocr_camera" showSlotTag={showSlotTag} className="shrink-0">
                         <img
                           src="./assets/extracted/feed_icon_camera.png"
-                          alt="拍照扫描记录"
+                          alt="扫描纸质本"
                           referrerPolicy="no-referrer"
                           className="h-10 w-11 object-contain"
                         />
@@ -733,303 +666,52 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                   )}
 
                   <div
-                    onClick={() => {
-                      if (capturedPhotoUrl) {
-                        setLightboxPhotoUrl(capturedPhotoUrl);
-                      } else {
-                        cameraInputRef.current?.click();
-                      }
-                    }}
+                    onClick={() => setIsPaperScanOpen(true)}
                     className="min-w-0 flex-1 cursor-pointer"
                   >
-                    <div className="text-[15px] font-bold leading-snug text-[#182848]">
-                      {capturedPhotoUrl ? '已扫描照片' : '拍照扫描记录'}
+                    <div className="text-[14.5px] font-bold leading-snug text-[#182848]">
+                      扫描纸质本导入
                     </div>
-                    <div className="truncate text-[11.5px] text-[#6d6256]">
-                      {capturedPhotoUrl
-                        ? '点缩略图放大查看 · 支持批量录入'
-                        : '拍纸质喂养本，本地离线自动识别'}
+                    <div className="truncate text-[11px] text-[#6d6256]">
+                      iOS 实况文本批量识字，自动拆分喂奶与大小便
                     </div>
                   </div>
                 </div>
 
-                {/* 明确分离的「拍照」和「相册」按钮，真实唤起原生相机或相册 */}
                 <div className="flex shrink-0 items-center gap-1.5">
                   <button
                     type="button"
-                    disabled={photoStatus === 'scanning'}
-                    onClick={() => cameraInputRef.current?.click()}
-                    className="inline-flex items-center gap-1 rounded-full bg-gradient-to-b from-[#fde074] to-[#f4bd36] px-2.5 py-1.5 text-[12px] font-bold text-[#182848] shadow-[0_2px_8px_rgba(244,189,54,0.35)] transition-transform active:scale-95 disabled:opacity-60"
+                    onClick={() => setIsPaperScanOpen(true)}
+                    className="inline-flex items-center gap-1 rounded-full bg-gradient-to-b from-[#fde074] to-[#f4bd36] px-2.5 py-1.5 text-[12px] font-bold text-[#182848] shadow-[0_2px_8px_rgba(244,189,54,0.35)] transition-transform active:scale-95"
                   >
-                    <Camera className="h-3.5 w-3.5" />
-                    <span>{capturedPhotoUrl ? '重拍' : '拍照'}</span>
+                    <ScanText className="h-3.5 w-3.5" />
+                    <span>扫描纸质本</span>
                   </button>
                   <button
                     type="button"
-                    disabled={photoStatus === 'scanning'}
+                    onClick={() => cameraInputRef.current?.click()}
+                    title="附带单条记录现场照片"
+                    aria-label="附带照片留档"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#dfd1b5] bg-[#f7eedc] text-[#4e463e] transition-transform active:scale-95"
+                  >
+                    <Camera className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => galleryInputRef.current?.click()}
-                    className="inline-flex items-center gap-1 rounded-full border border-[#dfd1b5] bg-[#f7eedc] px-2.5 py-1.5 text-[12px] font-semibold text-[#4e463e] transition-transform active:scale-95 disabled:opacity-60"
+                    title="从相册附带照片"
+                    aria-label="从相册选择照片"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#dfd1b5] bg-[#f7eedc] text-[#4e463e] transition-transform active:scale-95"
                   >
                     <ImageIcon className="h-3.5 w-3.5" />
-                    <span>相册</span>
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* 本地离线 OCR 识别状态与进度反馈条 */}
-            {photoStatus !== 'idle' && (
-              <div className="relative space-y-2">
-                <div
-                  className={`flex w-full flex-col gap-2 rounded-[20px] border px-3.5 py-2.5 text-left shadow-[0_6px_16px_rgba(3,8,24,0.28)] transition-colors ${
-                    photoStatus === 'scanning'
-                      ? 'border-amber-200 bg-amber-100/95 text-amber-950'
-                      : photoStatus === 'parsed'
-                      ? 'border-[#d8eab1] bg-gradient-to-r from-[#b9d98c] to-[#cce3a2] text-[#1c3917]'
-                      : photoStatus === 'no_match'
-                      ? 'border-amber-300/90 bg-[#fef3d6] text-[#5c3d0c]'
-                      : 'border-rose-200 bg-[#fdeaea] text-[#6d1f26]'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex min-w-0 flex-1 items-start gap-2">
-                      <span
-                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white shadow-2xs ${
-                          photoStatus === 'scanning'
-                            ? 'bg-amber-500'
-                            : photoStatus === 'parsed'
-                            ? 'bg-[#3f8f33]'
-                            : photoStatus === 'no_match'
-                            ? 'bg-amber-600'
-                            : 'bg-rose-500'
-                        }`}
-                      >
-                        {photoStatus === 'scanning' ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : photoStatus === 'parsed' ? (
-                          <Check className="h-3.5 w-3.5 stroke-[3]" />
-                        ) : (
-                          <AlertCircle className="h-3.5 w-3.5" />
-                        )}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2 text-[12.5px] font-semibold leading-snug">
-                          <span>{photoMessage}</span>
-                          {photoStatus === 'scanning' && (
-                            <span className="shrink-0 font-typewriter text-[11.5px] tabular-nums">
-                              {ocrProgress}%
-                            </span>
-                          )}
-                        </div>
-                        {photoSubNote && (
-                          <div className="mt-0.5 text-[11px] leading-snug opacity-85">
-                            {photoSubNote}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {(photoStatus === 'parsed' || photoStatus === 'no_match') && (
-                      <button
-                        type="button"
-                        onClick={() => setShowRawTextEditor((v) => !v)}
-                        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/75 px-2.5 py-1 text-[11px] font-semibold text-[#2d251e] shadow-2xs transition-transform active:scale-95"
-                      >
-                        <ScanText className="h-3 w-3" />
-                        <span>{showRawTextEditor ? '收起原文' : '校正文字'}</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {photoStatus === 'scanning' && (
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-amber-950/12">
-                      <div
-                        className="h-full rounded-full bg-amber-500 transition-[width] duration-200"
-                        style={{ width: `${Math.max(8, ocrProgress)}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* 多条纸质喂养记录批量录入面板（2条及以上时自动出现） */}
-                {ocrDrafts.length > 1 && (
-                  <div className="rounded-[20px] border border-amber-200/40 bg-[#132552]/92 p-3 text-slate-100 shadow-[0_10px_24px_rgba(3,8,24,0.45)] backdrop-blur-md">
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-[13px] font-semibold text-amber-200">
-                        <Sparkles className="h-3.5 w-3.5" />
-                        <span>纸质记录批量核对（{ocrDrafts.filter((d) => d.selected).length}/{ocrDrafts.length}）</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const allSelected = ocrDrafts.every((d) => d.selected);
-                          setOcrDrafts((prev) =>
-                            prev.map((item) => ({ ...item, selected: !allSelected }))
-                          );
-                        }}
-                        className="text-[11px] text-amber-200/85 underline-offset-2 hover:underline"
-                      >
-                        {ocrDrafts.every((d) => d.selected) ? '全不选' : '全选'}
-                      </button>
-                    </div>
-
-                    <div className="max-h-48 space-y-1.5 overflow-y-auto no-scrollbar pr-0.5">
-                      {ocrDrafts.map((draft) => (
-                        <div
-                          key={draft.id}
-                          className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 transition-colors ${
-                            draft.selected
-                              ? 'border-amber-300/35 bg-[#1b3368]/85'
-                              : 'border-white/10 bg-white/5 opacity-60'
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setOcrDrafts((prev) =>
-                                prev.map((it) =>
-                                  it.id === draft.id ? { ...it, selected: !it.selected } : it
-                                )
-                              )
-                            }
-                            aria-label="勾选此条记录"
-                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
-                              draft.selected
-                                ? 'border-amber-300 bg-amber-300 text-[#182848]'
-                                : 'border-white/30 bg-transparent text-transparent'
-                            }`}
-                          >
-                            <Check className="h-3.5 w-3.5 stroke-[3]" />
-                          </button>
-
-                          <input
-                            type="time"
-                            value={draft.time}
-                            onChange={(e) =>
-                              setOcrDrafts((prev) =>
-                                prev.map((it) =>
-                                  it.id === draft.id ? { ...it, time: e.target.value } : it
-                                )
-                              )
-                            }
-                            className="w-[74px] shrink-0 rounded-lg bg-[#0d1c42] px-1.5 py-1 font-typewriter text-[12px] text-amber-100 tabular-nums focus:outline-none focus:ring-1 focus:ring-amber-300"
-                          />
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setOcrDrafts((prev) =>
-                                prev.map((it) => {
-                                  if (it.id !== draft.id) return it;
-                                  const nextType: FeedingType =
-                                    it.type === 'formula' ? 'breast' : 'formula';
-                                  return {
-                                    ...it,
-                                    type: nextType,
-                                    breastSide: nextType === 'breast' ? 'both' : undefined,
-                                  };
-                                })
-                              )
-                            }
-                            className="shrink-0 rounded-lg bg-white/10 px-2 py-1 text-[11px] font-semibold text-amber-100"
-                            title="点击切换配方奶/母乳"
-                          >
-                            {draft.type === 'formula'
-                              ? '配方奶'
-                              : draft.type === 'breast'
-                              ? '母乳'
-                              : draft.type === 'solids'
-                              ? '辅食'
-                              : '营养品'}
-                          </button>
-
-                          {draft.type === 'formula' || draft.type === 'breast' ? (
-                            <div className="flex min-w-0 flex-1 items-center gap-1">
-                              <input
-                                type="number"
-                                inputMode="numeric"
-                                value={draft.amountMl ?? draft.durationMin ?? ''}
-                                onChange={(e) => {
-                                  const v = Math.max(0, parseInt(e.target.value || '0', 10) || 0);
-                                  setOcrDrafts((prev) =>
-                                    prev.map((it) =>
-                                      it.id === draft.id
-                                        ? it.durationMin && !it.amountMl
-                                          ? { ...it, durationMin: v }
-                                          : { ...it, amountMl: v }
-                                        : it
-                                    )
-                                  );
-                                }}
-                                className="w-14 rounded-lg bg-[#0d1c42] px-1.5 py-1 text-right font-typewriter text-[12.5px] font-bold text-white tabular-nums focus:outline-none focus:ring-1 focus:ring-amber-300"
-                              />
-                              <span className="text-[11px] text-indigo-200/80">
-                                {draft.durationMin && !draft.amountMl ? '分钟' : 'ml'}
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="min-w-0 flex-1 truncate text-[12px] text-amber-100">
-                              {draft.foodName} {draft.foodAmount}
-                            </div>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => applyDraftToForm(draft)}
-                            className="shrink-0 rounded-lg bg-amber-300/15 px-1.5 py-1 text-[10.5px] text-amber-200"
-                          >
-                            填入
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={ocrDrafts.every((d) => !d.selected)}
-                      onClick={handleBatchImportDrafts}
-                      className="mt-2.5 flex min-h-[40px] w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-b from-[#ffe25e] via-[#facc34] to-[#f1a819] px-4 py-2 text-[13.5px] font-bold text-[#182848] shadow-[0_6px_16px_rgba(244,179,30,0.35)] transition-transform active:scale-[0.98] disabled:opacity-50"
-                    >
-                      <Check className="h-4 w-4 stroke-[2.8]" />
-                      <span>
-                        一键批量录入已选 {ocrDrafts.filter((d) => d.selected).length} 条记录
-                      </span>
-                    </button>
-                  </div>
-                )}
-
-                {/* 可展开的识别原文校正区（手写体局部错字时可改字后一键重新解析） */}
-                {showRawTextEditor && photoStatus !== 'scanning' && (
-                  <div className="rounded-[18px] border border-white/15 bg-[#0f1f48]/92 p-3 text-slate-100 shadow-lg">
-                    <div className="mb-1.5 flex items-center justify-between text-[11.5px] text-indigo-200/85">
-                      <span>识别原文（每行如：08:30 配方奶 120ml）</span>
-                      <button
-                        type="button"
-                        onClick={handleReparseRawText}
-                        className="inline-flex items-center gap-1 rounded-full bg-amber-300 px-2.5 py-0.5 text-[11px] font-bold text-[#182848] active:scale-95"
-                      >
-                        <RefreshCw className="h-3 w-3" />
-                        <span>重新解析</span>
-                      </button>
-                    </div>
-                    <textarea
-                      rows={4}
-                      value={ocrRawText}
-                      onChange={(e) => setOcrRawText(e.target.value)}
-                      placeholder={'例如：\n07:30 配方奶 120ml\n10:45 母乳 90ml\n14:00 130ml'}
-                      className="w-full rounded-xl border border-white/12 bg-[#091433] p-2.5 text-[12px] leading-relaxed text-amber-50 placeholder:text-indigo-300/45 focus:border-amber-300 focus:outline-none"
-                    />
-                  </div>
-                )}
-
-                {photoStatus === 'parsed' && ocrDrafts.length === 1 && (
-                  <img
-                    src="./assets/extracted/feed_glow_star.png"
-                    alt=""
-                    aria-hidden="true"
-                    className="pointer-events-none absolute -bottom-2.5 -right-1 z-20 h-7 w-7 object-contain drop-shadow-[0_0_8px_rgba(253,224,71,0.85)]"
-                  />
-                )}
+            {photoError && (
+              <div className="rounded-2xl border border-rose-200 bg-[#fdeaea] px-3 py-2 text-[12px] text-[#6d1f26]">
+                {photoError}
               </div>
             )}
           </div>
@@ -1416,14 +1098,24 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
               />
             </AssetSlot>
 
-            <button
-              type="button"
-              onClick={() => onChangeMode('form')}
-              className="absolute bottom-4 flex min-h-[46px] items-center justify-center gap-2 rounded-full border-2 border-[#fff3bd]/80 bg-gradient-to-b from-[#fde074] to-[#f2b830] px-7 py-2.5 typo-cta text-[#182848] shadow-[0_8px_22px_rgba(249,207,76,0.5)] transition-transform hover:brightness-105 active:scale-95"
-            >
-              <Camera className="h-4.5 w-4.5 stroke-[2.2]" />
-              <span>去记录第一条喂养</span>
-            </button>
+            <div className="absolute bottom-4 flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => onChangeMode('form')}
+                className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-full border-2 border-[#fff3bd]/80 bg-gradient-to-b from-[#fde074] to-[#f2b830] px-5 py-2.5 typo-cta text-[#182848] shadow-[0_8px_22px_rgba(249,207,76,0.5)] transition-transform hover:brightness-105 active:scale-95"
+              >
+                <Plus className="h-4.5 w-4.5 stroke-[2.5]" />
+                <span>记一顿</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPaperScanOpen(true)}
+                className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-full border border-amber-200/60 bg-[#142758]/90 px-4 py-2.5 text-[13.5px] font-bold text-amber-100 shadow-[0_8px_22px_rgba(3,9,28,0.5)] backdrop-blur-md transition-transform active:scale-95"
+              >
+                <ScanText className="h-4 w-4 text-amber-300" />
+                <span>扫描纸质本</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1758,7 +1450,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
 
             {/* 米白撕纸「⭐ 喂养记录」时间线卡片 */}
             <section aria-label="喂养记录时间线" className="diary-paper-card px-1.5 py-1">
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
                   <img
                     src="./assets/extracted/feed_glow_star.png"
@@ -1771,7 +1463,15 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                   </h2>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsPaperScanOpen(true)}
+                    className="inline-flex items-center gap-1 rounded-full border border-[#decba7] bg-[#fffaf0] px-2.5 py-1 typo-badge font-semibold text-[#182848] shadow-2xs transition-transform active:scale-95"
+                  >
+                    <ScanText className="h-3.5 w-3.5 text-[#d97706]" />
+                    <span>扫描纸质本</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => onChangeMode('form')}
@@ -1783,13 +1483,29 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowAllRecords((v) => !v)}
-                    className="inline-flex items-center gap-0.5 typo-meta font-medium text-[#6a5d4f] hover:text-[#182848]"
+                    className="inline-flex items-center gap-0.5 pl-0.5 typo-meta font-medium text-[#6a5d4f] hover:text-[#182848]"
                   >
                     <span>{showAllRecords ? '仅当日' : '全部'}</span>
                     <ChevronRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
+
+              {/* 当日大小便统计摘要（有记录时展示） */}
+              {(dayDiaperSummary.poop > 0 || dayDiaperSummary.pee > 0) && !showAllRecords && (
+                <div className="mb-2.5 flex flex-wrap items-center gap-1.5 px-1">
+                  {dayDiaperSummary.poop > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-[#dfc39a] bg-[#f7ead4] px-2.5 py-0.5 text-[11px] font-semibold text-[#7c3f0e]">
+                      大便 {dayDiaperSummary.poop} 次
+                    </span>
+                  )}
+                  {dayDiaperSummary.pee > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-[#a9dcf0] bg-[#e2f5fc] px-2.5 py-0.5 text-[11px] font-semibold text-[#0b7296]">
+                      小便 {dayDiaperSummary.pee} 次
+                    </span>
+                  )}
+                </div>
+              )}
 
               {/* 竖向虚线时间轴记录列表 */}
               <div className="relative pl-4">
@@ -1876,6 +1592,31 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
               }}
               className="w-full h-auto object-cover"
             />
+          </div>
+        </div>
+      )}
+
+      {/* iOS 原生实况文本「扫描纸质本」底部抽屉 */}
+      <PaperLogScanSheet
+        open={isPaperScanOpen}
+        selectedDate={selectedDate}
+        recorder={formRecorder || currentRecorder || state.profile.recorders[0] || '妈妈'}
+        onClose={() => setIsPaperScanOpen(false)}
+        onConfirmImport={handleConfirmPaperImport}
+      />
+
+      {/* 存入成功轻提示 Toast */}
+      {importToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed inset-x-4 top-[calc(var(--header-top-pad,20px)+12px)] z-[60] flex justify-center"
+        >
+          <div className="inline-flex items-center gap-2 rounded-full border border-amber-200/70 bg-[#152855]/95 px-4 py-2 text-[13px] font-semibold text-amber-100 shadow-[0_10px_28px_rgba(3,8,24,0.55)] backdrop-blur-md">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#6ca651] text-white">
+              <Check className="h-3.5 w-3.5 stroke-[3]" />
+            </span>
+            <span>{importToast}</span>
           </div>
         </div>
       )}

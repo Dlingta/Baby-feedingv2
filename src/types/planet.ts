@@ -45,7 +45,7 @@ export interface DiaryEntry {
   updatedAt?: string;
 }
 
-export type FeedingType = 'breast' | 'formula' | 'solids' | 'supplement';
+export type FeedingType = 'breast' | 'formula' | 'solids' | 'supplement' | 'poop' | 'pee';
 
 export interface FeedingRecord {
   id: string;
@@ -55,6 +55,8 @@ export interface FeedingRecord {
   breastSide?: 'left' | 'right' | 'both';
   durationMin?: number;
   amountMl?: number;
+  /** 大小便次数（默认 1 次） */
+  count?: number;
   foodName?: string;
   foodAmount?: string;
   note?: string;
