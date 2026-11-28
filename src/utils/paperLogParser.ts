@@ -9,6 +9,8 @@ export type PaperLogItemType =
 
 export interface PaperLogDraft {
   id: string;
+  /** 可选 YYYY-MM-DD，若纸面识别到日期或用户手动修改则使用该日期 */
+  date?: string;
   time: string; // HH:mm
   type: PaperLogItemType;
   /** 配方奶/瓶喂母乳 -> ml；亲喂 -> 分钟；大便/小便 -> 次 */
@@ -387,9 +389,11 @@ export function convertPaperDraftsToFeedingRecords(
 
   return drafts.map((draft, idx) => {
     const safeTime = /^\d{2}:\d{2}$/.test(draft.time) ? draft.time : '08:00';
+    const safeDate =
+      draft.date && /^\d{4}-\d{2}-\d{2}$/.test(draft.date) ? draft.date : selectedDate;
     const base = {
       id: `feed-paper-${nowTs}-${idx}`,
-      date: selectedDate,
+      date: safeDate,
       time: safeTime,
       recorder: recorder || '妈妈',
       photoUrl: idx === 0 && photoUrl ? photoUrl : undefined,

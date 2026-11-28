@@ -10,12 +10,19 @@ export interface ProcessedFeedingPhoto {
 }
 
 interface ApiRecognizedItem {
+  date?: unknown;
   time?: unknown;
   type?: unknown;
   amountMl?: unknown;
   durationMin?: unknown;
   count?: unknown;
   note?: unknown;
+}
+
+export interface RecognizeFeedingPhotoResult {
+  drafts: PaperLogDraft[];
+  /** Date recognized from the paper log (YYYY-MM-DD), or null if no date was written */
+  detectedDate: string | null;
 }
 
 const VALID_TYPES = new Set<PaperLogItemType>([
@@ -123,8 +130,9 @@ function toSafeNum(raw: unknown, fallback: number, min: number, max: number): nu
  */
 export async function recognizeFeedingPhotoViaApi(
   recognizeDataUrl: string,
-  fallbackTime: string
-): Promise<PaperLogDraft[]> {
+  fallbackTime: string,
+  referenceDate?: string
+): Promise<RecognizeFeedingPhotoResult> {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), 50_000);
 
@@ -134,7 +142,10 @@ export async function recognizeFeedingPhotoViaApi(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ image: recognizeDataUrl }),
+      body: JSON.stringify({
+        image: recognizeDataUrl,
+        referenceDate,
+      }),
       signal: controller.signal,
     });
 
@@ -162,12 +173,20 @@ export async function recognizeFeedingPhotoViaApi(
 
     const batchTs = Date.now();
     const drafts: PaperLogDraft[] = [];
+    let detectedDate: string | null = null;
 
     list.forEach((item, idx) => {
       if (!item || typeof item !== 'object') return;
       const rawType = typeof item.type === 'string' ? item.type.trim() : '';
       if (!VALID_TYPES.has(rawType as PaperLogItemType)) return;
       const type = rawType as PaperLogItemType;
+      const itemDate =
+        typeof item.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.date.trim())
+          ? item.date.trim()
+          : undefined;
+      if (itemDate && !detectedDate) {
+        detectedDate = itemDate;
+      }
       const time = normalizeTimeStr(item.time, fallbackTime);
       const note = typeof item.note === 'string' ? item.note.trim().slice(0, 80) : '';
 
@@ -184,6 +203,7 @@ export async function recognizeFeedingPhotoViaApi(
 
       drafts.push({
         id: `ai-paper-${batchTs}-${idx}`,
+        date: itemDate,
         time,
         type,
         value,
@@ -191,7 +211,7 @@ export async function recognizeFeedingPhotoViaApi(
       });
     });
 
-    return drafts;
+    return { drafts, detectedDate };
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
       throw new Error('识别超时了，请检查网络或重新拍一张清晰一点的照片');

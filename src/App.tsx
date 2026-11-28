@@ -14,6 +14,7 @@ import {
   VaccineFundingType,
 } from './types/planet';
 import { createInitialAppState, getTodayDateStr } from './data/initialData';
+import { mergeWithClinicVaccineCatalog } from './data/vaccineCatalog';
 import { BottomNav } from './components/BottomNav';
 import { HomeSettingsDrawer } from './components/HomeSettingsDrawer';
 import { PreviewWidthPreset, PrototypeSidebar } from './components/PrototypeSidebar';
@@ -171,13 +172,14 @@ export default function App() {
             }
           }
 
-          parsed.vaccines = parsed.vaccines.map((v) => {
+          const migratedVaccines = parsed.vaccines.map((v) => {
             const fresh = freshInit.vaccines.find((init) => init.id === v.id);
             if (fresh && isLegacyDate(v.inoculatedDate)) {
               return { ...v, inoculatedDate: fresh.inoculatedDate };
             }
             return v;
           });
+          parsed.vaccines = mergeWithClinicVaccineCatalog(migratedVaccines, getTodayDateStr());
 
           return parsed;
         }
@@ -623,7 +625,13 @@ export default function App() {
     date: string,
     note: string,
     brandOrigin?: VaccineBrandOrigin,
-    fundingType?: VaccineFundingType
+    fundingType?: VaccineFundingType,
+    extra?: {
+      selectedOptionId?: string;
+      selectedOptionLabel?: string;
+      brandName?: string;
+      pricePaid?: string;
+    }
   ) => {
     hapticSuccess();
     const now = new Date().toISOString();
@@ -635,7 +643,11 @@ export default function App() {
               status: 'activated' as const,
               inoculatedDate: date,
               brandOrigin: brandOrigin || v.brandOrigin || '国产',
-              fundingType: fundingType || v.fundingType || '免费',
+              fundingType: fundingType || v.fundingType || (v.planCategory === 'optional' ? '自费' : '免费'),
+              selectedOptionId: extra?.selectedOptionId ?? v.selectedOptionId,
+              selectedOptionLabel: extra?.selectedOptionLabel ?? v.selectedOptionLabel,
+              brandName: extra?.brandName !== undefined ? extra.brandName : v.brandName,
+              pricePaid: extra?.pricePaid !== undefined ? extra.pricePaid : v.pricePaid,
               note,
               updatedAt: now,
             }
@@ -663,8 +675,12 @@ export default function App() {
               ...v,
               status: 'locked' as const,
               inoculatedDate: undefined,
+              selectedOptionId: undefined,
+              selectedOptionLabel: undefined,
               brandOrigin: undefined,
+              brandName: undefined,
               fundingType: undefined,
+              pricePaid: undefined,
               note: undefined,
               updatedAt: now,
             }

@@ -118,6 +118,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
   const [paperScanStatus, setPaperScanStatus] = useState<PaperScanSheetStatus>('recognizing');
   const [paperScanPhotoUrl, setPaperScanPhotoUrl] = useState<string | null>(null);
   const [paperScanDrafts, setPaperScanDrafts] = useState<PaperLogDraft[]>([]);
+  const [paperScanDetectedDate, setPaperScanDetectedDate] = useState<string | null>(null);
   const [paperScanError, setPaperScanError] = useState<string | null>(null);
   const [importToast, setImportToast] = useState<string | null>(null);
   const [lightboxPhotoUrl, setLightboxPhotoUrl] = useState<string | null>(null);
@@ -251,6 +252,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
     setPaperScanStatus('recognizing');
     setPaperScanError(null);
     setPaperScanDrafts([]);
+    setPaperScanDetectedDate(null);
     setPaperScanPhotoUrl(null);
 
     try {
@@ -259,13 +261,15 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
 
       setPaperScanPhotoUrl(processed.previewDataUrl);
 
-      const drafts = await recognizeFeedingPhotoViaApi(
+      const result = await recognizeFeedingPhotoViaApi(
         processed.recognizeDataUrl,
-        processed.exifTime || getCurrentTimeStr()
+        processed.exifTime || getCurrentTimeStr(),
+        getTodayDateStr()
       );
       if (requestId !== aiScanRequestIdRef.current) return;
 
-      setPaperScanDrafts(drafts);
+      setPaperScanDrafts(result.drafts);
+      setPaperScanDetectedDate(result.detectedDate);
       setPaperScanStatus('review');
     } catch (err) {
       if (requestId !== aiScanRequestIdRef.current) return;
@@ -276,7 +280,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
     }
   };
 
-  const handleConfirmPaperImport = (records: FeedingRecord[]) => {
+  const handleConfirmPaperImport = (records: FeedingRecord[], targetDate: string) => {
     if (records.length === 0) return;
     if (onAddFeedings) {
       onAddFeedings(records);
@@ -286,10 +290,18 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
     setIsPaperScanOpen(false);
     setPaperScanPhotoUrl(null);
     setPaperScanDrafts([]);
+    setPaperScanDetectedDate(null);
     setPaperScanError(null);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+      setSelectedDate(targetDate);
+      setShowAllRecords(false);
+    }
     void hapticSuccess();
     onChangeMode('timeline');
-    showToast(`已成功存入 ${records.length} 条纸质记录`);
+    const shortDate = /^\d{4}-\d{2}-\d{2}$/.test(targetDate)
+      ? `${targetDate.slice(5).replace('-', '.')} 的 `
+      : '';
+    showToast(`已成功存入 ${shortDate}${records.length} 条纸质记录`);
   };
 
   const handleKeypadPress = (key: string) => {
@@ -1609,6 +1621,7 @@ export const FeedingScreen: React.FC<FeedingScreenProps> = ({
         open={isPaperScanOpen}
         status={paperScanStatus}
         selectedDate={selectedDate}
+        detectedDate={paperScanDetectedDate}
         recorder={formRecorder || currentRecorder || state.profile.recorders[0] || '妈妈'}
         photoDataUrl={paperScanPhotoUrl}
         initialDrafts={paperScanDrafts}

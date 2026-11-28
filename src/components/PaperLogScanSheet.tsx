@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
+  Calendar,
   Camera,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Image as ImageIcon,
   Loader2,
@@ -15,7 +18,7 @@ import {
   ZoomIn,
 } from 'lucide-react';
 import { FeedingRecord } from '../types/planet';
-import { getCurrentTimeStr } from '../data/initialData';
+import { getCurrentTimeStr, getTodayDateStr } from '../data/initialData';
 import {
   convertPaperDraftsToFeedingRecords,
   PAPER_LOG_TYPE_LIST,
@@ -24,12 +27,23 @@ import {
   PaperLogItemType,
 } from '../utils/paperLogParser';
 
+function shiftYmd(dateStr: string, deltaDays: number): string {
+  const base = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr : getTodayDateStr();
+  const d = new Date(`${base}T00:00:00`);
+  d.setDate(d.getDate() + deltaDays);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export type PaperScanSheetStatus = 'recognizing' | 'review' | 'error';
 
 interface PaperLogScanSheetProps {
   open: boolean;
   status: PaperScanSheetStatus;
   selectedDate: string;
+  detectedDate?: string | null;
   recorder: string;
   photoDataUrl: string | null;
   initialDrafts: PaperLogDraft[];
@@ -38,13 +52,14 @@ interface PaperLogScanSheetProps {
   onRetakeCamera: () => void;
   onPickAlbum: () => void;
   onSwitchToReview?: () => void;
-  onConfirmImport: (records: FeedingRecord[]) => void;
+  onConfirmImport: (records: FeedingRecord[], targetDate: string) => void;
 }
 
 export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
   open,
   status,
   selectedDate,
+  detectedDate = null,
   recorder,
   photoDataUrl,
   initialDrafts,
@@ -56,6 +71,7 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
   onConfirmImport,
 }) => {
   const [drafts, setDrafts] = useState<PaperLogDraft[]>(initialDrafts);
+  const [importDate, setImportDate] = useState<string>(detectedDate || selectedDate);
   const [zoomPhoto, setZoomPhoto] = useState(false);
 
   useEffect(() => {
@@ -63,12 +79,29 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
   }, [initialDrafts]);
 
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      setImportDate(detectedDate || selectedDate);
+    } else {
       setZoomPhoto(false);
     }
-  }, [open]);
+  }, [open, detectedDate, selectedDate]);
+
+  const todayStr = getTodayDateStr();
+  const yesterdayStr = useMemo(() => shiftYmd(todayStr, -1), [todayStr]);
+  const dayBeforeYesterdayStr = useMemo(() => shiftYmd(todayStr, -2), [todayStr]);
+
+  const hasMultipleDates = useMemo(() => {
+    const distinct = new Set(drafts.map((d) => d.date || importDate));
+    return distinct.size > 1;
+  }, [drafts, importDate]);
 
   if (!open) return null;
+
+  const handleChangeImportDate = (nextDate: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(nextDate)) return;
+    setImportDate(nextDate);
+    setDrafts((prev) => prev.map((item) => ({ ...item, date: nextDate })));
+  };
 
   const handleUpdateDraft = (id: string, patch: Partial<PaperLogDraft>) => {
     setDrafts((prev) =>
@@ -110,6 +143,7 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
     const lastTime = drafts.length > 0 ? drafts[drafts.length - 1].time : getCurrentTimeStr();
     const newDraft: PaperLogDraft = {
       id: `paper-manual-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      date: importDate,
       time: lastTime,
       type: 'formula',
       value: 120,
@@ -125,11 +159,11 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
     if (drafts.length === 0) return;
     const records = convertPaperDraftsToFeedingRecords(
       drafts,
-      selectedDate,
+      importDate,
       recorder,
       photoDataUrl
     );
-    onConfirmImport(records);
+    onConfirmImport(records, importDate);
   };
 
   return (
@@ -166,10 +200,10 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
                 </h2>
                 <p className="truncate text-[11px] text-indigo-100/80">
                   {status === 'recognizing'
-                    ? 'AI 正在逐行阅读保姆手写的奶量与大小便'
+                    ? 'AI 正在逐行辨认纸面上的日期、奶量与大小便'
                     : status === 'error'
                     ? '可重新拍照、换相册照片或直接手动补录'
-                    : `将导入至 ${selectedDate.replace(/-/g, '.')} · 点击卡片即可微调`}
+                    : `将导入至 ${importDate.replace(/-/g, '.')} · 点击日期或卡片即可调整`}
                 </p>
               </div>
             </div>
@@ -275,6 +309,84 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
         {status === 'review' && (
           <>
             <div className="flex-1 space-y-2.5 overflow-y-auto px-4 pb-3 pt-3">
+              {/* 归属日期选择器：默认自动回填纸面日期，支持一键选前天/昨天/今天或任意日历日期 */}
+              <div className="rounded-[18px] border border-[#e3d2b1] bg-[#fffdf7] px-3 py-2.5 shadow-[0_3px_10px_rgba(120,90,40,0.06)]">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-[#182848]">
+                    <Calendar className="h-3.5 w-3.5 text-[#d97706]" />
+                    <span>记录归属日期</span>
+                  </div>
+                  {detectedDate && importDate === detectedDate ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10.5px] font-bold text-amber-800">
+                      <Sparkles className="h-3 w-3" />
+                      <span>已识别纸面日期</span>
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-[#847563]">可切换补录哪一天</span>
+                  )}
+                </div>
+
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1 rounded-xl border border-[#e2d2b4] bg-[#f7eedc] px-1 py-0.5">
+                    <button
+                      type="button"
+                      onClick={() => handleChangeImportDate(shiftYmd(importDate, -1))}
+                      aria-label="前一天"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-[#5b4d3e] hover:bg-white/60 active:scale-90"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+
+                    <label className="relative cursor-pointer px-1.5 font-typewriter text-[13.5px] font-bold text-[#182848] tabular-nums">
+                      <span>{importDate.replace(/-/g, '.')}</span>
+                      <input
+                        type="date"
+                        value={importDate}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleChangeImportDate(e.target.value);
+                          }
+                        }}
+                        className="absolute inset-0 cursor-pointer opacity-0"
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => handleChangeImportDate(shiftYmd(importDate, 1))}
+                      aria-label="后一天"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-[#5b4d3e] hover:bg-white/60 active:scale-90"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    {[
+                      { label: '前天', value: dayBeforeYesterdayStr },
+                      { label: '昨天', value: yesterdayStr },
+                      { label: '今天', value: todayStr },
+                    ].map((opt) => {
+                      const active = importDate === opt.value;
+                      return (
+                        <button
+                          key={opt.label}
+                          type="button"
+                          onClick={() => handleChangeImportDate(opt.value)}
+                          className={`rounded-full border px-2.5 py-1 text-[11.5px] font-semibold transition-all active:scale-95 ${
+                            active
+                              ? 'border-[#e8a81c] bg-gradient-to-b from-[#fde074] to-[#f4bd36] text-[#182848] shadow-2xs'
+                              : 'border-[#e2d2b4] bg-[#fffaf0] text-[#6d5f4d]'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
               {/* 顶部原图缩略对照条 + 重拍/相册入口 */}
               {photoDataUrl && (
                 <div className="flex items-center justify-between gap-2 rounded-[16px] border border-[#e3d2b1] bg-[#fffaf0] px-3 py-2">
@@ -338,17 +450,33 @@ export const PaperLogScanSheet: React.FC<PaperLogScanSheetProps> = ({
               ) : (
                 drafts.map((draft, idx) => {
                   const meta = PAPER_LOG_TYPE_MAP[draft.type];
+                  const draftDate = draft.date || importDate;
                   return (
                     <div
                       key={draft.id}
                       className="rounded-[20px] border border-[#e3d2b1] bg-[#fffdf7] p-3 shadow-[0_4px_12px_rgba(120,90,40,0.08)]"
                     >
-                      {/* 第 1 行：序号 + 时间选择 + 删除 */}
+                      {/* 第 1 行：序号 + (跨天时显示单条日期) + 时间选择 + 删除 */}
                       <div className="mb-2.5 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <span className="flex h-5.5 w-5.5 items-center justify-center rounded-full bg-[#182848] font-typewriter text-[11px] font-bold text-amber-200">
                             {idx + 1}
                           </span>
+                          {hasMultipleDates && (
+                            <label className="relative inline-flex cursor-pointer items-center gap-1 rounded-xl border border-[#e2d2b4] bg-[#fff5df] px-2 py-1 font-typewriter text-[12px] font-bold text-[#7c5318] tabular-nums">
+                              <span>{draftDate.slice(5).replace('-', '.')}</span>
+                              <input
+                                type="date"
+                                value={draftDate}
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    handleUpdateDraft(draft.id, { date: e.target.value });
+                                  }
+                                }}
+                                className="absolute inset-0 cursor-pointer opacity-0"
+                              />
+                            </label>
+                          )}
                           <label className="inline-flex items-center gap-1.5 rounded-xl border border-[#e2d2b4] bg-[#f7eedc] px-2.5 py-1 text-[13px] font-bold text-[#182848]">
                             <Clock className="h-3.5 w-3.5 text-[#7a6953]" />
                             <input

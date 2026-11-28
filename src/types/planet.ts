@@ -84,6 +84,18 @@ export interface GrowthRecord {
 export type VaccineStatus = 'activated' | 'next' | 'locked';
 export type VaccineBrandOrigin = '国产' | '进口' | '其他';
 export type VaccineFundingType = '免费' | '自费';
+export type VaccinePlanCategory = 'mandatory' | 'optional';
+
+export interface VaccineChoiceOption {
+  id: string;
+  label: string;
+  shortTag: string;
+  fundingType: VaccineFundingType;
+  brandOrigin: VaccineBrandOrigin;
+  brandName?: string;
+  priceHint?: string;
+  detailNote?: string;
+}
 
 export interface VaccineDose {
   id: string;
@@ -92,6 +104,21 @@ export interface VaccineDose {
   doseLabel: string;
   recommendedMonth: string;
   description: string;
+  /** 免疫规划（免费必打）或 非免疫规划（自愿自费） */
+  planCategory?: VaccinePlanCategory;
+  /** 选择提示（如“五价进口/三价国产 二选一”“可自费选五联/四联替代”） */
+  selectionHint?: string;
+  /** 门诊注意事项（如口服前后半小时勿喝热奶） */
+  clinicTip?: string;
+  /** 同一剂次下的具体可选方案（品牌/进口国产/价次/替代方案） */
+  options?: VaccineChoiceOption[];
+  /** 用户选中的方案 ID 与展示名称 */
+  selectedOptionId?: string;
+  selectedOptionLabel?: string;
+  /** 具体品牌或生产厂家（如辉瑞·沛儿13、沃森·沃安欣、默沙东·乐儿德等） */
+  brandName?: string;
+  /** 实际花费（可选，如 309.5） */
+  pricePaid?: string;
   status: VaccineStatus;
   inoculatedDate?: string;
   brandOrigin?: VaccineBrandOrigin;

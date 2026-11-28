@@ -15,6 +15,7 @@ const VALID_TYPES = new Set([
 type RecognizedRecordType = 'formula' | 'breast_bottle' | 'breast_direct' | 'poop' | 'pee';
 
 export interface RecognizedPaperRecord {
+  date: string | null;
   time: string;
   type: RecognizedRecordType;
   amountMl: number | null;
@@ -23,10 +24,23 @@ export interface RecognizedPaperRecord {
   note: string;
 }
 
-const RECOGNITION_PROMPT = `请仔细识别图片中保姆手写的纸质宝宝喂养记录，按时间顺序列出所有喂奶和大小便事件。如果同一行同时写了喂奶和大小便，请拆分成两条独立记录。
+function getDefaultReferenceDate(): string {
+  // Default to Asia/Shanghai (UTC+8) date string YYYY-MM-DD
+  const nowUtc8 = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  const y = nowUtc8.getUTCFullYear();
+  const m = String(nowUtc8.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(nowUtc8.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function buildRecognitionPrompt(referenceDate: string): string {
+  const refYear = referenceDate.slice(0, 4);
+  return `请仔细识别图片中保姆手写的纸质宝宝喂养记录，按时间顺序列出所有喂奶和大小便事件。如果同一行同时写了喂奶和大小便，请拆分成两条独立记录。
+同时请留意纸面顶部或行首是否写有日期（如“11月25日”、“11.25”、“2026-11-25”等）。当前参考日期为 ${referenceDate}，若纸面只写了月和日未写年份，年份默认按 ${refYear} 补全为 YYYY-MM-DD；若整张纸确实没有写任何日期，date 填 null。
 请严格仅返回如下 JSON 数组格式，不要输出任何其他解释文字：
 [
   {
+    "date": "${referenceDate}", // 若纸面写有日期请转为 YYYY-MM-DD，完全没写日期则填 null
     "time": "08:30",
     "type": "formula", // 枚举值：formula(配方奶) | breast_bottle(瓶喂母乳) | breast_direct(亲喂) | poop(大便) | pee(小便)
     "amountMl": 120,   // 仅配方奶/瓶喂母乳填数字，其余为 null
@@ -35,6 +49,7 @@ const RECOGNITION_PROMPT = `请仔细识别图片中保姆手写的纸质宝宝�
     "note": ""         // 可选，记录特殊备注如“吐奶”“偏稀”
   }
 ]`;
+}
 
 interface VercelLikeRequest extends IncomingMessage {
   body?: unknown;
@@ -111,6 +126,51 @@ function cleanModelJsonText(rawContent: string): string {
   return cleaned;
 }
 
+function formatValidYmd(year: number, month: number, day: number, referenceYear: number): string | null {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+  if (year < 2020 || year > referenceYear + 1) return null;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const check = new Date(Date.UTC(year, month - 1, day));
+  if (
+    check.getUTCFullYear() !== year ||
+    check.getUTCMonth() !== month - 1 ||
+    check.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function normalizeDate(raw: unknown, referenceYear: number): string | null {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed || /^(null|none|unknown|未知|无)$/i.test(trimmed)) return null;
+
+  // YYYY-MM-DD / YYYY.M.D / YYYY/M/D / YYYY年M月D日
+  const fullMatch = trimmed.match(/^(20\d{2})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*[日号]?$/);
+  if (fullMatch) {
+    return formatValidYmd(
+      parseInt(fullMatch[1], 10),
+      parseInt(fullMatch[2], 10),
+      parseInt(fullMatch[3], 10),
+      referenceYear
+    );
+  }
+
+  // M月D日 / M.D / M/D / M-D (infer referenceYear)
+  const mdMatch = trimmed.match(/^(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*[日号]?$/);
+  if (mdMatch) {
+    return formatValidYmd(
+      referenceYear,
+      parseInt(mdMatch[1], 10),
+      parseInt(mdMatch[2], 10),
+      referenceYear
+    );
+  }
+
+  return null;
+}
+
 function normalizeTime(raw: unknown): string {
   if (typeof raw !== 'string') return '08:00';
   const normalized = raw
@@ -131,7 +191,7 @@ function toPositiveNumber(raw: unknown, min: number, max: number): number | null
   return Math.min(max, Math.max(min, Math.round(num)));
 }
 
-function normalizeRecords(parsed: unknown): RecognizedPaperRecord[] {
+function normalizeRecords(parsed: unknown, referenceYear: number): RecognizedPaperRecord[] {
   const arr = Array.isArray(parsed)
     ? parsed
     : parsed && typeof parsed === 'object' && Array.isArray((parsed as { records?: unknown }).records)
@@ -141,12 +201,20 @@ function normalizeRecords(parsed: unknown): RecognizedPaperRecord[] {
   if (!arr) return [];
 
   const result: RecognizedPaperRecord[] = [];
+  let lastSeenDate: string | null = null;
+
   for (const item of arr.slice(0, 40)) {
     if (!item || typeof item !== 'object') continue;
     const rec = item as Record<string, unknown>;
     const rawType = typeof rec.type === 'string' ? rec.type.trim() : '';
     if (!VALID_TYPES.has(rawType as RecognizedRecordType)) continue;
     const type = rawType as RecognizedRecordType;
+
+    const itemDate = normalizeDate(rec.date, referenceYear);
+    if (itemDate) {
+      lastSeenDate = itemDate;
+    }
+    const effectiveDate = itemDate ?? lastSeenDate;
 
     const time = normalizeTime(rec.time);
     const note =
@@ -155,6 +223,7 @@ function normalizeRecords(parsed: unknown): RecognizedPaperRecord[] {
     if (type === 'formula' || type === 'breast_bottle') {
       const amountMl = toPositiveNumber(rec.amountMl, 10, 450) ?? (type === 'formula' ? 120 : 100);
       result.push({
+        date: effectiveDate,
         time,
         type,
         amountMl,
@@ -165,6 +234,7 @@ function normalizeRecords(parsed: unknown): RecognizedPaperRecord[] {
     } else if (type === 'breast_direct') {
       const durationMin = toPositiveNumber(rec.durationMin, 1, 90) ?? 15;
       result.push({
+        date: effectiveDate,
         time,
         type,
         amountMl: null,
@@ -175,6 +245,7 @@ function normalizeRecords(parsed: unknown): RecognizedPaperRecord[] {
     } else {
       const count = toPositiveNumber(rec.count, 1, 20) ?? 1;
       result.push({
+        date: effectiveDate,
         time,
         type,
         amountMl: null,
@@ -182,6 +253,14 @@ function normalizeRecords(parsed: unknown): RecognizedPaperRecord[] {
         count,
         note,
       });
+    }
+  }
+
+  // Backfill earlier rows if the date appeared on a later row on the same page
+  const firstDetected = result.find((r) => r.date)?.date ?? null;
+  if (firstDetected) {
+    for (const r of result) {
+      if (!r.date) r.date = firstDetected;
     }
   }
 
@@ -235,6 +314,13 @@ export default async function handler(
     return;
   }
 
+  // Strictly validate optional referenceDate (YYYY-MM-DD) for inferring missing year on paper
+  const rawRefDate = typeof body.referenceDate === 'string' ? body.referenceDate.trim() : '';
+  const referenceDate = /^\d{4}-\d{2}-\d{2}$/.test(rawRefDate)
+    ? rawRefDate
+    : getDefaultReferenceDate();
+  const referenceYear = parseInt(referenceDate.slice(0, 4), 10) || new Date().getUTCFullYear();
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 45_000);
 
@@ -260,7 +346,7 @@ export default async function handler(
               },
               {
                 type: 'text',
-                text: RECOGNITION_PROMPT,
+                text: buildRecognitionPrompt(referenceDate),
               },
             ],
           },
@@ -315,7 +401,7 @@ export default async function handler(
       return;
     }
 
-    const records = normalizeRecords(parsed);
+    const records = normalizeRecords(parsed, referenceYear);
     sendJson(res, 200, records);
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {

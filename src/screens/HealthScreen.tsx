@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  Info,
   Lock,
   Pencil,
   Plus,
@@ -17,10 +18,12 @@ import {
   IllnessRecord,
   PlanetAppState,
   VaccineBrandOrigin,
+  VaccineChoiceOption,
   VaccineDose,
   VaccineFundingType,
 } from '../types/planet';
 import { getCurrentTimeStr, getTodayDateStr, shiftDateStr } from '../data/initialData';
+import { CLINIC_VACCINE_TIPS } from '../data/vaccineCatalog';
 import { AssetSlot } from '../components/Illustrations';
 import {
   CosmicModuleHeader,
@@ -43,7 +46,13 @@ interface HealthScreenProps {
     date: string,
     note: string,
     brandOrigin?: VaccineBrandOrigin,
-    fundingType?: VaccineFundingType
+    fundingType?: VaccineFundingType,
+    extra?: {
+      selectedOptionId?: string;
+      selectedOptionLabel?: string;
+      brandName?: string;
+      pricePaid?: string;
+    }
   ) => void;
   onResetVaccine: (doseId: string) => void;
   onAddIllness: (record: IllnessRecord) => void;
@@ -78,23 +87,35 @@ const SYMPTOM_OPTIONS = [
 
 type IllnessFilterKey = 'all' | 'fever' | 'respiratory' | 'skin_other' | 'with_case';
 
-/** 根据宝宝出生日期估算推荐接种日期（如“2 月龄” -> 出生后约 60 天） */
+type VaccineFilterKey = 'all' | 'mandatory' | 'optional' | 'activated' | 'pending';
+
+/** 根据宝宝出生日期估算推荐接种日期（兼容“出生 24h 内”“1.5 月龄”“1 岁 6.5 月龄”“3 岁”等） */
 function estimateDoseDate(birthDate: string, recommendedMonth: string): string {
   if (!birthDate) return recommendedMonth;
   if (recommendedMonth.includes('出生')) {
     return birthDate.replace(/-/g, '.');
   }
-  const monthMatch = recommendedMonth.match(/(\d+)\s*月龄/);
-  if (monthMatch) {
-    const months = parseInt(monthMatch[1], 10);
-    return shiftDateStr(birthDate, months * 30).replace(/-/g, '.');
+  const yearMonthMatch = recommendedMonth.match(
+    /(\d+)\s*(?:周)?岁(?:\s*(\d+(?:\.\d+)?)\s*月龄)?/
+  );
+  if (yearMonthMatch) {
+    const years = parseInt(yearMonthMatch[1], 10);
+    const extraMonths = yearMonthMatch[2] ? parseFloat(yearMonthMatch[2]) : 0;
+    const totalDays = Math.round(years * 365 + extraMonths * 30);
+    return shiftDateStr(birthDate, totalDays).replace(/-/g, '.');
   }
-  const yearMatch = recommendedMonth.match(/(\d+)\s*周岁/);
-  if (yearMatch) {
-    const years = parseInt(yearMatch[1], 10);
-    return shiftDateStr(birthDate, years * 365).replace(/-/g, '.');
+  const monthMatch = recommendedMonth.match(/(\d+(?:\.\d+)?)\s*月龄/);
+  if (monthMatch) {
+    const months = parseFloat(monthMatch[1]);
+    return shiftDateStr(birthDate, Math.round(months * 30)).replace(/-/g, '.');
   }
   return recommendedMonth;
+}
+
+function extractNumericPrice(priceHint?: string): string {
+  if (!priceHint || priceHint.includes('免费')) return '';
+  const m = priceHint.match(/(\d+(?:\.\d+)?)/);
+  return m ? m[1] : '';
 }
 
 function getDiseaseLabel(rec: IllnessRecord): string {
@@ -144,20 +165,35 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
   onToggleIllnessHandled,
   onDeleteIllness,
 }) => {
+  // 按宝宝性别过滤仅适用女孩的疫苗（如 9 岁 HPV）
+  const visibleVaccines = useMemo(() => {
+    if (state.profile.gender === 'boy') {
+      return state.vaccines.filter((v) => v.id !== 'vac-opt-hpv');
+    }
+    return state.vaccines;
+  }, [state.vaccines, state.profile.gender]);
+
   const defaultNextDose =
-    state.vaccines.find((v) => v.status === 'next') || state.vaccines[3] || state.vaccines[0];
+    visibleVaccines.find((v) => v.status === 'next') ||
+    visibleVaccines.find((v) => v.status !== 'activated') ||
+    visibleVaccines[0] ||
+    state.vaccines[0];
 
   // 5.1 疫苗列表交互状态
-  const [vaccineFilter, setVaccineFilter] = useState<'all' | 'activated' | 'pending'>('all');
+  const [vaccineFilter, setVaccineFilter] = useState<VaccineFilterKey>('all');
   const [showAllVaccines, setShowAllVaccines] = useState(false);
   const [showHeaderPanel, setShowHeaderPanel] = useState(false);
+  const [showClinicTips, setShowClinicTips] = useState(false);
 
   // 5.2 确认接种信息表单状态
   const [selectedDoseId, setSelectedDoseId] = useState<string>(
     activeSheetDoseId || defaultNextDose.id
   );
+  const [vacOptionId, setVacOptionId] = useState<string>('');
   const [vacBrand, setVacBrand] = useState<VaccineBrandOrigin>('国产');
   const [vacFunding, setVacFunding] = useState<VaccineFundingType>('免费');
+  const [vacBrandName, setVacBrandName] = useState<string>('');
+  const [vacPricePaid, setVacPricePaid] = useState<string>('');
   const [vacDate, setVacDate] = useState<string>(() => getTodayDateStr());
   const [vacNote, setVacNote] = useState<string>('');
 
@@ -184,54 +220,93 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
   const [recorder, setRecorder] = useState(currentRecorder || state.profile.recorders[0] || '妈妈');
   const casePhotoInputRef = useRef<HTMLInputElement>(null);
 
+  const syncFormFromDose = (dose: VaccineDose) => {
+    const matchedOpt =
+      (dose.selectedOptionId && dose.options?.find((o) => o.id === dose.selectedOptionId)) ||
+      dose.options?.[0];
+    const resolvedFunding: VaccineFundingType =
+      dose.fundingType ||
+      matchedOpt?.fundingType ||
+      (dose.planCategory === 'optional' ? '自费' : '免费');
+    const resolvedOrigin: VaccineBrandOrigin =
+      dose.brandOrigin || matchedOpt?.brandOrigin || '国产';
+
+    setSelectedDoseId(dose.id);
+    setVacOptionId(matchedOpt?.id || '');
+    setVacFunding(resolvedFunding);
+    setVacBrand(resolvedOrigin);
+    setVacBrandName(dose.brandName ?? matchedOpt?.brandName ?? '');
+    setVacPricePaid(
+      dose.pricePaid ?? (resolvedFunding === '自费' ? extractNumericPrice(matchedOpt?.priceHint) : '')
+    );
+    setVacDate(dose.inoculatedDate || getTodayDateStr());
+    setVacNote(dose.note || '');
+  };
+
   // 当从首页“去打卡”或侧栏直达 5.2 时，同步预填选中疫苗信息
   useEffect(() => {
     if (mode === 'vaccine_sheet') {
       const targetId = activeSheetDoseId || defaultNextDose.id;
-      const target = state.vaccines.find((v) => v.id === targetId) || defaultNextDose;
-      setSelectedDoseId(target.id);
-      setVacBrand(target.brandOrigin || '国产');
-      setVacFunding(target.fundingType || '免费');
-      setVacDate(target.inoculatedDate || getTodayDateStr());
-      setVacNote(target.note || '');
+      const target = visibleVaccines.find((v) => v.id === targetId) || defaultNextDose;
+      if (target) {
+        syncFormFromDose(target);
+      }
     }
   }, [mode, activeSheetDoseId]);
 
   const activeDose =
-    state.vaccines.find((v) => v.id === selectedDoseId) || defaultNextDose;
+    visibleVaccines.find((v) => v.id === selectedDoseId) || defaultNextDose;
 
-  const activatedCount = state.vaccines.filter((v) => v.status === 'activated').length;
+  const activatedCount = visibleVaccines.filter((v) => v.status === 'activated').length;
+  const mandatoryVaccines = useMemo(
+    () => visibleVaccines.filter((v) => v.planCategory !== 'optional'),
+    [visibleVaccines]
+  );
+  const optionalVaccines = useMemo(
+    () => visibleVaccines.filter((v) => v.planCategory === 'optional'),
+    [visibleVaccines]
+  );
+  const mandatoryActivatedCount = mandatoryVaccines.filter((v) => v.status === 'activated').length;
   const isIllnessView = mode === 'illness' || mode === 'illness_form';
 
   const openVaccineForm = (dose: VaccineDose) => {
-    setSelectedDoseId(dose.id);
-    setVacBrand(dose.brandOrigin || '国产');
-    setVacFunding(dose.fundingType || '免费');
-    setVacDate(dose.inoculatedDate || getTodayDateStr());
-    setVacNote(dose.note || '');
+    syncFormFromDose(dose);
     setShowHeaderPanel(false);
     onChangeMode('vaccine_sheet');
   };
 
   const handleSelectDoseInForm = (doseId: string) => {
-    const found = state.vaccines.find((v) => v.id === doseId);
-    setSelectedDoseId(doseId);
+    const found = visibleVaccines.find((v) => v.id === doseId);
     if (found) {
-      setVacBrand(found.brandOrigin || '国产');
-      setVacFunding(found.fundingType || '免费');
-      setVacDate(found.inoculatedDate || getTodayDateStr());
-      setVacNote(found.note || '');
+      syncFormFromDose(found);
+    } else {
+      setSelectedDoseId(doseId);
     }
+  };
+
+  const handleSelectOptionInForm = (opt: VaccineChoiceOption) => {
+    setVacOptionId(opt.id);
+    setVacFunding(opt.fundingType);
+    setVacBrand(opt.brandOrigin);
+    setVacBrandName(opt.brandName || '');
+    setVacPricePaid(opt.fundingType === '自费' ? extractNumericPrice(opt.priceHint) : '');
   };
 
   const handleSaveVaccineForm = (e: React.FormEvent) => {
     e.preventDefault();
+    const selectedOpt = activeDose.options?.find((o) => o.id === vacOptionId);
     onConfirmVaccine(
       activeDose.id,
       vacDate || getTodayDateStr(),
       vacNote.trim() || '按计划顺利接种，留观 30 分钟无异常',
       vacBrand,
-      vacFunding
+      vacFunding,
+      {
+        selectedOptionId: selectedOpt?.id || undefined,
+        selectedOptionLabel: selectedOpt?.label || undefined,
+        brandName: vacBrandName.trim() || undefined,
+        pricePaid: vacFunding === '自费' ? vacPricePaid.trim() || undefined : undefined,
+      }
     );
     onChangeMode('vaccine');
   };
@@ -355,9 +430,11 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
     onChangeMode('illness');
   };
 
-  // 5.1 过滤后的疫苗列表（默认展示最近已完成 + 下一针 + 后续 2 针，支持一键展开全部 19 剂）
+  // 5.1 过滤后的疫苗列表（默认聚焦近期 4-5 剂，支持按免费必打 / 自费可选 / 已完成筛选与全部展开）
   const filteredVaccines = useMemo(() => {
-    const base = state.vaccines.filter((dose) => {
+    const base = visibleVaccines.filter((dose) => {
+      if (vaccineFilter === 'mandatory') return dose.planCategory !== 'optional';
+      if (vaccineFilter === 'optional') return dose.planCategory === 'optional';
       if (vaccineFilter === 'activated') return dose.status === 'activated';
       if (vaccineFilter === 'pending') return dose.status !== 'activated';
       return true;
@@ -367,12 +444,12 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
       return base;
     }
 
-    // 聚焦展示：最后 1 针已完成 + 下一针 + 紧随其后的 2 针待解锁，完整还原设计图清爽 4 行视觉密度
+    // 聚焦展示：最后 1 针已完成 + 下一针 + 紧随其后的 3 针待解锁
     const nextIdx = base.findIndex((v) => v.status === 'next');
     if (nextIdx === -1) return base.slice(0, 5);
     const start = Math.max(0, nextIdx - 1);
-    return base.slice(start, Math.min(base.length, start + 4));
-  }, [state.vaccines, vaccineFilter, showAllVaccines]);
+    return base.slice(start, Math.min(base.length, start + 5));
+  }, [visibleVaccines, vaccineFilter, showAllVaccines]);
 
   // 5.3 过滤后的生病记录列表
   const filteredIllnesses = useMemo(() => {
@@ -465,23 +542,29 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
             {showHeaderPanel && (
               <div className="relative z-20 mx-4 mb-2.5 rounded-[22px] border border-white/15 bg-[#122350]/88 px-3.5 py-3 shadow-[0_10px_24px_rgba(3,8,24,0.42)] backdrop-blur-md">
                 <div className="flex items-center justify-between typo-meta">
-                  <span className="font-medium text-amber-100">防御护盾进度</span>
+                  <span className="font-medium text-amber-100">免疫规划必打进度</span>
                   <span className="font-typewriter typo-num text-amber-300">
-                    已接种 {activatedCount} / {state.vaccines.length} 剂
+                    必打 {mandatoryActivatedCount}/{mandatoryVaccines.length} · 全部 {activatedCount}/{visibleVaccines.length}
                   </span>
                 </div>
                 <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/15">
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-[#85d965] to-[#fde047] transition-all duration-300"
-                    style={{ width: `${Math.round((activatedCount / state.vaccines.length) * 100)}%` }}
+                    style={{
+                      width: `${Math.round(
+                        (mandatoryActivatedCount / Math.max(1, mandatoryVaccines.length)) * 100
+                      )}%`,
+                    }}
                   />
                 </div>
-                <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
                   {(
                     [
-                      { id: 'all', label: `全部 (${state.vaccines.length})` },
+                      { id: 'all', label: `全部 (${visibleVaccines.length})` },
+                      { id: 'mandatory', label: `免费必打 (${mandatoryVaccines.length})` },
+                      { id: 'optional', label: `自费可选 (${optionalVaccines.length})` },
                       { id: 'activated', label: `已完成 (${activatedCount})` },
-                      { id: 'pending', label: `待接种 (${state.vaccines.length - activatedCount})` },
+                      { id: 'pending', label: `待接种 (${visibleVaccines.length - activatedCount})` },
                     ] as const
                   ).map((opt) => (
                     <button
@@ -491,7 +574,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                         setVaccineFilter(opt.id);
                         if (opt.id !== 'all') setShowAllVaccines(true);
                       }}
-                      className={`rounded-full py-1 typo-badge transition-all ${
+                      className={`rounded-full px-2.5 py-1 typo-badge transition-all ${
                         vaccineFilter === opt.id
                           ? 'bg-gradient-to-b from-[#ffe260] to-[#f4b324] font-semibold text-[#1f1809]'
                           : 'bg-white/10 text-indigo-100/80 hover:bg-white/15'
@@ -551,7 +634,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                     />
                   </svg>
                   <div className="mt-1 typo-meta text-amber-200/85 tabular-nums">
-                    护盾已激活 {activatedCount} / {state.vaccines.length} 剂
+                    必打 {mandatoryActivatedCount}/{mandatoryVaccines.length} · 护盾共 {activatedCount}/{visibleVaccines.length} 剂
                   </div>
                 </div>
 
@@ -567,14 +650,56 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
 
           {/* 撕纸疫苗时间轴主卡片 */}
           <div className="diary-paper-card relative z-20 min-w-0 px-1.5 py-2">
+            {/* 卡片内快捷分类筛选：区分免费必打与自费可选 */}
+            <div className="mb-1.5 flex items-center gap-1.5 overflow-x-auto px-1 pb-1 pt-0.5 no-scrollbar">
+              {(
+                [
+                  { id: 'all', label: '全部计划' },
+                  { id: 'mandatory', label: `免费必打 (${mandatoryVaccines.length})` },
+                  { id: 'optional', label: `自费可选 (${optionalVaccines.length})` },
+                  { id: 'activated', label: `已打 (${activatedCount})` },
+                ] as const
+              ).map((chip) => {
+                const active = vaccineFilter === chip.id;
+                return (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    onClick={() => {
+                      setVaccineFilter(chip.id);
+                      if (chip.id !== 'all') setShowAllVaccines(true);
+                    }}
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold transition-all active:scale-95 ${
+                      active
+                        ? 'border border-[#ecc048] bg-gradient-to-b from-[#ffe469] to-[#f7c235] text-[#281e08] shadow-[0_2px_6px_rgba(247,194,53,0.3)]'
+                        : 'border border-[#e4d8c3] bg-[#f7f0e2] text-[#6a5f51] hover:bg-[#efe4cf]'
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="relative space-y-1">
               {filteredVaccines.map((dose, idx) => {
                 const isActivated = dose.status === 'activated';
                 const isNext = dose.status === 'next';
                 const isLast = idx === filteredVaccines.length - 1;
+                const isOptional = dose.planCategory === 'optional';
+                const optionCount = dose.options?.length || 0;
                 const displayDate = dose.inoculatedDate
                   ? dose.inoculatedDate.replace(/-/g, '.')
                   : estimateDoseDate(state.profile.birthDate, dose.recommendedMonth);
+
+                const recordedSummary = [
+                  dose.brandName || dose.selectedOptionLabel,
+                  dose.brandOrigin,
+                  dose.fundingType,
+                  dose.pricePaid ? `¥${dose.pricePaid}` : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ');
 
                 return (
                   <button
@@ -591,6 +716,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                             ? 'bg-[#66ba49] shadow-[0_0_6px_rgba(102,186,73,0.65)]'
                             : isNext
                             ? 'bg-[#f4b626] shadow-[0_0_8px_rgba(244,182,38,0.75)]'
+                            : isOptional
+                            ? 'bg-[#94b5cf]'
                             : 'bg-[#bdb3a4]'
                         }`}
                       />
@@ -620,20 +747,37 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                       />
                     </div>
 
-                    {/* 日期 + 疫苗名称与剂次 */}
+                    {/* 日期 + 分类标签 + 疫苗名称与可选提示 */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 typo-meta text-[#5b5349] tabular-nums">
+                      <div className="flex flex-wrap items-center gap-1 typo-meta text-[#5b5349] tabular-nums">
                         <span className="font-typewriter">{displayDate}</span>
                         <span className="text-[#8b7f70]">· {dose.recommendedMonth}</span>
+                        {isOptional ? (
+                          <span className="rounded-md bg-[#e5eff8] px-1.5 py-[1px] text-[10px] font-bold text-[#2b5e8a]">
+                            {optionCount === 2
+                              ? '自费·二选一'
+                              : optionCount > 2
+                              ? `自费·${optionCount}选一`
+                              : '自费可选'}
+                          </span>
+                        ) : (
+                          <span className="rounded-md bg-[#e3f1d8] px-1.5 py-[1px] text-[10px] font-bold text-[#3b7a24]">
+                            免费必打
+                          </span>
+                        )}
                       </div>
                       <div className="mt-0.5 truncate typo-item-title text-[#1e293f]">
                         {dose.name} {dose.doseLabel}
                       </div>
-                      {isActivated && (dose.brandOrigin || dose.fundingType) && (
-                        <div className="mt-0.5 typo-badge text-[#7a6f62]">
-                          {[dose.brandOrigin, dose.fundingType].filter(Boolean).join(' · ')}
+                      {isActivated && recordedSummary ? (
+                        <div className="mt-0.5 truncate typo-badge text-[#6d6254]">
+                          {recordedSummary}
                         </div>
-                      )}
+                      ) : dose.selectionHint ? (
+                        <div className="mt-0.5 truncate text-[10.5px] text-[#8a7d6d]">
+                          {dose.selectionHint}
+                        </div>
+                      ) : null}
                     </div>
 
                     {/* 右侧手绘状态标签 */}
@@ -667,9 +811,9 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               })}
             </div>
 
-            {/* 展开 / 收起全部 19 剂入口 */}
-            {vaccineFilter === 'all' && state.vaccines.length > 4 && (
-              <div className="mt-1 border-t border-dashed border-[#dfd2ba] pt-2 text-center">
+            {/* 展开 / 收起全部计划 + 门诊温馨提示 */}
+            <div className="mt-1 flex flex-col items-center gap-1.5 border-t border-dashed border-[#dfd2ba] pt-2">
+              {vaccineFilter === 'all' && visibleVaccines.length > 5 && (
                 <button
                   type="button"
                   onClick={() => setShowAllVaccines((v) => !v)}
@@ -678,7 +822,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                   <span>
                     {showAllVaccines
                       ? '收起，仅聚焦近期计划'
-                      : `查看全部 ${state.vaccines.length} 剂疫苗计划`}
+                      : `查看全部 ${visibleVaccines.length} 剂疫苗计划（含自费可选）`}
                   </span>
                   <ChevronDown
                     className={`h-3.5 w-3.5 transition-transform ${
@@ -686,8 +830,33 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                     }`}
                   />
                 </button>
-              </div>
-            )}
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowClinicTips((v) => !v)}
+                className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium text-[#8a7964] transition-colors hover:bg-[#efe3cb]/70"
+              >
+                <Info className="h-3 w-3" />
+                <span>{showClinicTips ? '收起接种门诊温馨提示' : '查看接种门诊温馨提示'}</span>
+              </button>
+
+              {showClinicTips && (
+                <div className="mt-0.5 w-full rounded-2xl border border-[#e5d8bf] bg-[#f7f0e2] px-3 py-2.5 text-left">
+                  <div className="mb-1 text-[11.5px] font-bold text-[#3f3428]">
+                    预防接种门诊温馨提示
+                  </div>
+                  <ul className="space-y-1 text-[11px] leading-relaxed text-[#6b5d4e]">
+                    {CLINIC_VACCINE_TIPS.map((tip, i) => (
+                      <li key={i} className="flex gap-1.5">
+                        <span className="shrink-0 font-bold text-[#c78b18]">{i + 1}.</span>
+                        <span>{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
 
             </div>
@@ -791,16 +960,29 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
             </div>
 
             <div className="space-y-3.5">
-              {/* 1. 疫苗选择 */}
+              {/* 1. 疫苗选择（按免疫规划免费必打 / 非免疫规划自费可选分组） */}
               <div>
-                <div className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-bold text-[#25324e]">
-                  <img
-                    src="./assets/extracted/health_star_small.png"
-                    alt=""
-                    aria-hidden="true"
-                    className="h-3.5 w-3.5 object-contain"
-                  />
-                  <span>疫苗选择</span>
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-[#25324e]">
+                    <img
+                      src="./assets/extracted/health_star_small.png"
+                      alt=""
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 object-contain"
+                    />
+                    <span>疫苗选择</span>
+                  </div>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold ${
+                      activeDose.planCategory === 'optional'
+                        ? 'bg-[#e5eff8] text-[#2b5e8a]'
+                        : 'bg-[#e3f1d8] text-[#3b7a24]'
+                    }`}
+                  >
+                    {activeDose.planCategory === 'optional'
+                      ? '非免疫规划 · 自愿自费'
+                      : '免疫规划 · 免费必打'}
+                  </span>
                 </div>
                 <div className="relative flex items-center justify-between rounded-2xl border border-[#e3d5be] bg-[#faf4e8] px-3 py-2.5 shadow-[inset_0_1px_2px_rgba(120,96,60,0.06)]">
                   <div className="flex min-w-0 items-center gap-2">
@@ -814,9 +996,15 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                       aria-hidden="true"
                       className="h-6 w-6 shrink-0 object-contain"
                     />
-                    <span className="truncate text-[13.5px] font-bold text-[#1e2c49]">
-                      {activeDose.name}（{activeDose.doseLabel}）
-                    </span>
+                    <div className="min-w-0">
+                      <div className="truncate text-[13.5px] font-bold text-[#1e2c49]">
+                        {activeDose.name}（{activeDose.doseLabel}）
+                      </div>
+                      <div className="truncate text-[11px] text-[#7c7163]">
+                        推荐月龄：{activeDose.recommendedMonth}
+                        {activeDose.selectionHint ? ` · ${activeDose.selectionHint}` : ''}
+                      </div>
+                    </div>
                   </div>
                   <ChevronRight className="h-4.5 w-4.5 shrink-0 text-[#867a6b]" />
                   <select
@@ -825,17 +1013,154 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                     onChange={(e) => handleSelectDoseInForm(e.target.value)}
                     className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                   >
-                    {state.vaccines.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {String(v.order).padStart(2, '0')}. {v.name}（{v.doseLabel}）
-                        {v.status === 'activated' ? ' [已完成]' : v.status === 'next' ? ' [下一针]' : ''}
-                      </option>
-                    ))}
+                    <optgroup label="免疫规划疫苗（免费必打）">
+                      {mandatoryVaccines.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.recommendedMonth} · {v.name}（{v.doseLabel}）
+                          {v.status === 'activated' ? ' [已完成]' : v.status === 'next' ? ' [下一针]' : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="非免疫规划疫苗（自愿自费）">
+                      {optionalVaccines.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.recommendedMonth} · {v.name}（{v.doseLabel}）
+                          {v.status === 'activated' ? ' [已完成]' : v.status === 'next' ? ' [下一针]' : ''}
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
+                </div>
+
+                {activeDose.clinicTip && (
+                  <div className="mt-2 flex items-start gap-1.5 rounded-xl border border-[#eed8a6] bg-[#fdf4df] px-2.5 py-2 text-[11px] leading-relaxed text-[#7c5617]">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#d08d16]" />
+                    <span>{activeDose.clinicTip}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* 1.5 具体方案选择（二选一 / 多选一 / 免费或自费替代升级） */}
+              {activeDose.options && activeDose.options.length > 0 && (
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-[#25324e]">
+                      <img
+                        src="./assets/extracted/health_star_small.png"
+                        alt=""
+                        aria-hidden="true"
+                        className="h-3.5 w-3.5 object-contain"
+                      />
+                      <span>具体方案选择</span>
+                    </div>
+                    <span className="text-[11px] text-[#8a7d6d]">
+                      {activeDose.options.length === 1
+                        ? '推荐方案'
+                        : activeDose.options.some((o) => o.fundingType === '免费') &&
+                          activeDose.options.some((o) => o.fundingType === '自费')
+                        ? '免费必打 / 自费升级可选'
+                        : activeDose.options.length === 2
+                        ? '二选一，请勾选实际接种方案'
+                        : `${activeDose.options.length}选一，请勾选实际接种方案`}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {activeDose.options.map((opt) => {
+                      const isSelected = vacOptionId === opt.id;
+                      const isFree = opt.fundingType === '免费';
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => handleSelectOptionInForm(opt)}
+                          className={`w-full rounded-2xl border px-3 py-2.5 text-left transition-all active:scale-[0.99] ${
+                            isSelected
+                              ? 'border-[#e8b636] bg-[#fff7dc] shadow-[0_3px_10px_rgba(244,185,46,0.22)]'
+                              : 'border-[#e5d8c2] bg-[#faf4e8] hover:bg-[#f4ebd8]'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex min-w-0 items-start gap-2">
+                              <span
+                                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                                  isSelected
+                                    ? 'border-[#e0a216] bg-[#f4b626] text-white'
+                                    : 'border-[#cbbca5] bg-white'
+                                }`}
+                              >
+                                {isSelected && <Check className="h-2.5 w-2.5 stroke-[3]" />}
+                              </span>
+                              <div className="min-w-0">
+                                <div className="text-[12.5px] font-bold leading-snug text-[#1e2c49]">
+                                  {opt.label}
+                                </div>
+                                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                  <span
+                                    className={`rounded-md px-1.5 py-[1px] text-[10px] font-bold ${
+                                      isFree
+                                        ? 'bg-[#dff0d4] text-[#35731f]'
+                                        : 'bg-[#e6eff8] text-[#285985]'
+                                    }`}
+                                  >
+                                    {opt.shortTag}
+                                  </span>
+                                  {opt.priceHint && (
+                                    <span className="font-typewriter text-[10.5px] font-semibold text-[#8c6b2d]">
+                                      {opt.priceHint}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          {isSelected && opt.detailNote && (
+                            <div className="mt-1.5 border-t border-dashed border-[#ead9ae] pl-6 pt-1.5 text-[11px] leading-relaxed text-[#6b5d4c]">
+                              {opt.detailNote}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 2. 接种方式（免费 / 自费） */}
+              <div>
+                <div className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-bold text-[#25324e]">
+                  <img
+                    src="./assets/extracted/health_star_small.png"
+                    alt=""
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5 object-contain"
+                  />
+                  <span>接种方式</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5 pr-12">
+                  {FUNDING_OPTIONS.map((funding) => {
+                    const selected = vacFunding === funding;
+                    return (
+                      <button
+                        key={funding}
+                        type="button"
+                        onClick={() => {
+                          setVacFunding(funding);
+                          if (funding === '免费') setVacPricePaid('');
+                        }}
+                        className={`min-h-[38px] rounded-full text-[13px] font-bold transition-all active:scale-95 ${
+                          selected
+                            ? 'border border-[#f2c144] bg-gradient-to-b from-[#ffe469] to-[#f8c437] text-[#261c07] shadow-[0_3px_10px_rgba(248,196,55,0.35)]'
+                            : 'border border-[#e3d6c1] bg-[#f7f1e5] text-[#4f463c] hover:bg-[#f2e8d6]'
+                        }`}
+                      >
+                        {funding}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* 2. 品牌信息（国产 / 进口 / 其他） */}
+              {/* 3. 品牌产地（国产 / 进口 / 其他）+ 具体厂家与费用 */}
               <div>
                 <div className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-bold text-[#25324e]">
                   <img
@@ -865,37 +1190,30 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                     );
                   })}
                 </div>
-              </div>
 
-              {/* 3. 接种方式（免费 / 自费） */}
-              <div>
-                <div className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-bold text-[#25324e]">
-                  <img
-                    src="./assets/extracted/health_star_small.png"
-                    alt=""
-                    aria-hidden="true"
-                    className="h-3.5 w-3.5 object-contain"
+                <div className={`mt-2.5 grid gap-2 ${vacFunding === '自费' ? 'grid-cols-5' : 'grid-cols-1'}`}>
+                  <input
+                    type="text"
+                    value={vacBrandName}
+                    onChange={(e) => setVacBrandName(e.target.value)}
+                    placeholder="品牌/厂家（如 辉瑞沛儿13、默沙东乐儿德）"
+                    className={`${
+                      vacFunding === '自费' ? 'col-span-3' : 'col-span-1'
+                    } rounded-2xl border border-[#e3d5be] bg-[#faf4e8] px-3 py-2 text-[12.5px] text-[#242f46] placeholder:text-[#a69a8a] focus:border-[#f0bd3f] focus:outline-none`}
                   />
-                  <span>接种方式</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2.5 pr-12">
-                  {FUNDING_OPTIONS.map((funding) => {
-                    const selected = vacFunding === funding;
-                    return (
-                      <button
-                        key={funding}
-                        type="button"
-                        onClick={() => setVacFunding(funding)}
-                        className={`min-h-[38px] rounded-full text-[13px] font-bold transition-all active:scale-95 ${
-                          selected
-                            ? 'border border-[#f2c144] bg-gradient-to-b from-[#ffe469] to-[#f8c437] text-[#261c07] shadow-[0_3px_10px_rgba(248,196,55,0.35)]'
-                            : 'border border-[#e3d6c1] bg-[#f7f1e5] text-[#4f463c] hover:bg-[#f2e8d6]'
-                        }`}
-                      >
-                        {funding}
-                      </button>
-                    );
-                  })}
+                  {vacFunding === '自费' && (
+                    <div className="col-span-2 flex items-center rounded-2xl border border-[#e3d5be] bg-[#faf4e8] px-2.5 py-2 focus-within:border-[#f0bd3f]">
+                      <span className="mr-1 font-typewriter text-[12px] font-bold text-[#8b7a62]">¥</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={vacPricePaid}
+                        onChange={(e) => setVacPricePaid(e.target.value)}
+                        placeholder="费用"
+                        className="w-full min-w-0 bg-transparent font-typewriter text-[12.5px] font-semibold text-[#242f46] placeholder:text-[#a69a8a] focus:outline-none"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
