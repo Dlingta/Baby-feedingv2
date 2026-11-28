@@ -5,11 +5,21 @@ const ZHIPU_MODEL = 'glm-4-flash';
 const MAX_BODY_BYTES = 32 * 1024; // 32 KB
 const MAX_TEXT_CHARS = 4000;
 
-const POLISH_SYSTEM_PROMPT = `你是一位细心温和的文字整理助手，负责将一段父母口述的宝宝日常语音转录文本整理通顺。
+type BabyGender = 'boy' | 'girl' | 'star';
+
+function buildPolishSystemPrompt(babyGender?: BabyGender): string {
+  const genderRule =
+    babyGender === 'girl'
+      ? '\n4. 宝宝性别为【女宝】：文中指代宝宝的第三人称代词请统一使用“她”（把语音误转写的“他”或“它”统一改为“她”）。'
+      : babyGender === 'boy'
+      ? '\n4. 宝宝性别为【男宝】：文中指代宝宝的第三人称代词请统一使用“他”（把语音误转写的“她”或“它”统一改为“他”）。'
+      : '';
+
+  return `你是一位细心温和的文字整理助手，负责将一段父母口述的宝宝日常语音转录文本整理通顺。
 核心任务：
 1. 删除“嗯、啊、呃、哦、那个、就是说、然后呢”等口语语气词和重复的废话。
 2. 修正明显的同音错别字。
-3. 补全合理的标点符号和自然分段。
+3. 补全合理的标点符号和自然分段。${genderRule}
 
 严格禁止：
 1. 不要过度润色成华丽的散文或书面套话。
@@ -17,6 +27,7 @@ const POLISH_SYSTEM_PROMPT = `你是一位细心温和的文字整理助手，�
 3. 必须保留父母原汁原味的亲切口语感。
 
 输出要求：直接返回整理后的纯文本，不要带任何解释、前缀或引号。`;
+}
 
 interface VercelLikeRequest extends IncomingMessage {
   body?: unknown;
@@ -133,6 +144,12 @@ export default async function handler(
     return;
   }
 
+  const rawGender = typeof body.babyGender === 'string' ? body.babyGender.trim() : '';
+  const babyGender: BabyGender | undefined =
+    rawGender === 'boy' || rawGender === 'girl' || rawGender === 'star'
+      ? rawGender
+      : undefined;
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 25_000);
 
@@ -149,7 +166,7 @@ export default async function handler(
         messages: [
           {
             role: 'system',
-            content: POLISH_SYSTEM_PROMPT,
+            content: buildPolishSystemPrompt(babyGender),
           },
           {
             role: 'user',

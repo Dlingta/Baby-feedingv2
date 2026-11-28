@@ -17,7 +17,7 @@ import { calculatePlanetAge, getTodayDateStr } from '../data/initialData';
 import { AssetSlot, IconStar } from '../components/Illustrations';
 import { CosmicModuleHeader, CosmicSubHeader } from '../components/CosmicModuleHeader';
 import { hapticSuccess, hapticTap, speechBridge } from '../native/iosBridge';
-import { polishDiaryTextViaApi } from '../utils/diaryPolish';
+import { applyBabyGenderPronoun, polishDiaryTextViaApi } from '../utils/diaryPolish';
 
 export type DiaryViewMode = 'list' | 'detail' | 'empty' | 'form';
 
@@ -156,7 +156,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
     setVoiceNotice({ tone: 'info', text: '正在整理语气词…' });
 
     try {
-      const polished = await polishDiaryTextViaApi(trimmed);
+      const polished = await polishDiaryTextViaApi(trimmed, state.profile.gender);
       if (reqId !== polishRequestIdRef.current) return;
 
       if (polished && polished !== trimmed) {
@@ -259,7 +259,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
       try {
         setIsRecordingVoice(true);
         const stopNative = await speechBridge.startNative((text, isFinal) => {
-          const cleaned = text.trim();
+          const cleaned = applyBabyGenderPronoun(text.trim(), state.profile.gender);
           if (cleaned) {
             const prefix = voiceBaseTextRef.current;
             updateFormContent(prefix ? `${prefix}\n${cleaned}` : cleaned);
@@ -306,7 +306,7 @@ export const DiaryScreen: React.FC<DiaryScreenProps> = ({
         for (let i = 0; i < event.results.length; i++) {
           spoken += event.results[i][0]?.transcript || '';
         }
-        const cleaned = spoken.trim();
+        const cleaned = applyBabyGenderPronoun(spoken.trim(), state.profile.gender);
         if (cleaned) {
           const prefix = voiceBaseTextRef.current;
           updateFormContent(prefix ? `${prefix}\n${cleaned}` : cleaned);
